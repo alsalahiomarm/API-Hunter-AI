@@ -2,13 +2,20 @@
 # يبني خدمتي خلفية (Background Workers) من نفس المستودع.
 # ⚠️ القيم السرية تُترك فارغة (sync: false) وتُعَبَّأ من لوحة Render يدوياً
 #    حتى لا تُكشف أي مفاتيح داخل ملف الـ Blueprint ضمن المستودع.
+#
+# ⚠️ تنبيه التكلفة: خطة Free في Render متاحة للـ Web Services فقط،
+#    أما Background Workers فتبدأ من ~$7/شهر لكل خدمة (0.5 CPU / 512MB).
+#    لذلك لا نضع plan: free هنا (قيمة غير مدعومة لهذا النوع) ويُختار
+#    المستوى من لوحة Render أثناء Apply.
+#    بدائل مجانية 100%:
+#      • المحرك:  .github/workflows/hunt.yml (GitHub Actions كل 6 ساعات)
+#      • البوت:   تشغيل محلي على جهازك بالأمر:  npm run bot
 services:
 
   # ---------- الخدمة الأولى: بوت تليجرام ----------
   - type: worker
     name: api-hunter-bot
     runtime: node
-    plan: free
     region: frankfurt
     autoDeploy: true
     buildCommand: npm install --include=dev && npm run db:generate
@@ -38,7 +45,6 @@ services:
   - type: worker
     name: api-hunter-agent
     runtime: node
-    plan: free
     region: frankfurt
     autoDeploy: true
     buildCommand: npm install --include=dev && npm run db:generate && npx playwright install --with-deps chromium
@@ -56,4 +62,11 @@ services:
         sync: false
       - key: AGENT_SCHEDULE_HOURS
         value: "6"
+        sync: false
+      # توازي منخفض لأن الطبقة المجانية من Gemini محدودة بعدد الطلبات/دقيقة
+      - key: AGENT_CONCURRENCY
+        value: "2"
+        sync: false
+      - key: AI_MAX_ATTEMPTS
+        value: "3"
         sync: false

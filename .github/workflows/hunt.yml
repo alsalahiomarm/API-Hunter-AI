@@ -1,0 +1,72 @@
+# ============================================================
+# جولة اصطياد مجدولة على GitHub Actions (بديل مجاني 100% عن Render Worker)
+# يدعم مستودعات عامة بدون استهلاك دقائق، ويعمل كل 6 ساعات + تشغيل يدوي.
+#
+# الإعداد المطلوب (مرة واحدة): Settings → Secrets and variables → Actions
+#   DATABASE_URL   = رابط Supabase (سر)
+#   GEMINI_API_KEY = مفتاح Gemini (سر)
+# اختياري كمتغير (Variables): GEMINI_MODEL = gemini-flash-latest
+# ============================================================
+name: Hunt (جولة اصطياد مجدولة)
+
+on:
+  schedule:
+    - cron: "0 */6 * * *" # كل 6 ساعات (UTC)
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "معرفات المصادر مفصولة بفواصل (فارغ = كل المصادر)"
+        required: false
+        default: ""
+      limit:
+        description: "حد أقصى للمدخلات المحللة (0 = بلا حد)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: hunt
+  cancel-in-progress: false
+
+jobs:
+  hunt:
+    name: تشغيل محرك الاصطياد
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: تثبيت الحزم
+        run: npm ci
+
+      - name: توليد عميل Prisma
+        run: npm run db:generate
+
+      - name: تثبيت متصفح Playwright (اختياري - لا يُفشل المهمة)
+        continue-on-error: true
+        run: npx playwright install --with-deps chromium
+
+      - name: تنفيذ جولة اصطياد واحدة
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-flash-latest' }}
+          AGENT_CONCURRENCY: "2"
+          AI_MAX_ATTEMPTS: "3"
+        run: |
+          set -e
+          ARGS=""
+          SOURCES="${{ github.event.inputs.sources }}"
+          LIMIT="${{ github.event.inputs.limit }}"
+          if [ -n "$SOURCES" ]; then ARGS="$ARGS --sources=$SOURCES"; fi
+          if [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ]; then ARGS="$ARGS --limit=$LIMIT"; fi
+          echo "تنفيذ: npm run hunt:once -- $ARGS"
+          npm run hunt:once -- $ARGS
+
+      - name: ملخص النتيجة
+        if: always()
+        run: echo "انتهت الجولة. راجع السجل أعلاه لملخص الجولة."
