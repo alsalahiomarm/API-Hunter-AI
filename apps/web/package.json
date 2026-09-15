@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@apihunter/bot-core": "*",
     "@apihunter/db": "*",
     "lucide-react": "^0.462.0",
     "next": "^15.1.2",

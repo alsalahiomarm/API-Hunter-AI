@@ -1,0 +1,74 @@
+# ============================================================
+# ربط Webhook تليجرام برابط Vercel تلقائياً بعد كل نشر
+# يجعل البوت يعمل 24/7 بدون أي استضافة مدفوعة (بديل Render).
+#
+# الأسرار المطلوبة (Settings → Secrets and variables → Actions):
+#   TELEGRAM_BOT_TOKEN   (سر)
+#   BOT_WEBHOOK_SECRET   (سر) — نفس القيمة في متغيرات Vercel
+#   CRON_SECRET          (سر) — لنشر القناة
+# المتغيرات (Variables):
+#   BOT_WEBHOOK_URL = https://api-hunter-ai.vercel.app
+# ============================================================
+name: Telegram Webhook & Channel Broadcast
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/src/app/api/bot/**"
+      - "packages/bot-core/**"
+      - "scripts/set-webhook.ts"
+      - "vercel.json"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "set | info | delete"
+        required: false
+        default: "set"
+
+concurrency:
+  group: telegram-webhook
+  cancel-in-progress: false
+
+jobs:
+  webhook:
+    name: ربط الويب هوك بالمشروع
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: تثبيت الحزم
+        run: npm ci
+
+      - name: انتظار اكتمال نشر Vercel ثم ربط الويب هوك
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          BOT_WEBHOOK_SECRET: ${{ secrets.BOT_WEBHOOK_SECRET }}
+          BOT_WEBHOOK_URL: ${{ vars.BOT_WEBHOOK_URL || 'https://api-hunter-ai.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -e
+          ACTION="${{ github.event.inputs.action }}"
+          if [ -z "$ACTION" ]; then ACTION="set"; fi
+          if [ "$ACTION" = "set" ]; then
+            npm run webhook:set -- --wait
+          else
+            npx tsx scripts/set-webhook.ts "$ACTION"
+          fi
+
+      - name: نشر الخدمات الجديدة إلى القناة
+        if: ${{ github.event.inputs.action == '' || github.event.inputs.action == 'set' }}
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BOT_WEBHOOK_URL: ${{ vars.BOT_WEBHOOK_URL || 'https://api-hunter-ai.vercel.app' }}
+        run: |
+          set -e
+          if [ -z "$CRON_SECRET" ]; then echo "تخطي: CRON_SECRET غير مضبوط"; exit 0; fi
+          curl -sS -X POST "$BOT_WEBHOOK_URL/api/cron/broadcast" \
+            -H "Authorization: Bearer $CRON_SECRET" || true

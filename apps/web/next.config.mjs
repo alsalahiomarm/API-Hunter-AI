@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // السماح باستيراد حزمة قاعدة البيانات المشتركة في الوضع الأحادي
-  transpilePackages: ["@apihunter/db"],
+  // السماح باستيراد الحزم المشتركة (قاعدة البيانات + منطق البوت) في الوضع الأحادي
+  transpilePackages: ["@apihunter/db", "@apihunter/bot-core"],
   reactStrictMode: true,
 };
 

@@ -1,9 +1,7 @@
 import { config as loadEnv } from "dotenv";
 import { resolve } from "path";
 import { existsSync } from "fs";
-import { Telegraf } from "telegraf";
-import { registerCommands } from "./commands";
-import { publishPendingToChannel } from "./broadcaster";
+import { createBot, publishPendingToChannel } from "@apihunter/bot-core";
 
 // ----------------------------------------------------------
 // تحميل البيئة من apps/bot ثم من جذر المشروع
@@ -43,7 +41,7 @@ function printEnvStatus() {
   console.log("🔎 فحص مفاتيح البيئة (env):");
   for (const c of checks) {
     if (c.ok) console.log(`   ✅ ${c.key}`);
-    else console.log(`   ❌ ${c.key} — غير محدد. ${c.hint}`);
+    else console.log(`    ${c.key} — غير محدد. ${c.hint}`);
   }
   console.log("");
 }
@@ -61,48 +59,38 @@ const POLL_SECONDS = Math.max(Number(process.env.BOT_CHANNEL_POLL_SECONDS ?? 300
 
 async function main() {
   printEnvStatus();
-  const bot = new Telegraf(BOT_TOKEN);
+  const bot = createBot(BOT_TOKEN);
 
-  // الأوامر والرسائل الحرة
-  registerCommands(bot);
-
-  // رسالة احتياطية للمحتوى غير النصي
-  bot.on("message", async (ctx) => {
-    if (ctx.message && "text" in ctx.message) return;
-    await ctx.reply(
-      "أعتذر، أدعم النصوص فقط 📝. جرّب: /latest أو اكتب «مفتاح للبحث في الإنترنت»"
-    );
-  });
-
-  // بدء الحلقية
-  const usePolling = process.env.BOT_POLLING !== "false";
   try {
     await bot.telegram.getMe();
   } catch (err) {
-    console.error(
-      "❌ تعذّر الاتصال بتليجرام - تحقق من التوكن:",
-      (err as Error).message
-    );
+    console.error("❌ تعذّر الاتصال بتليجرام - تحقق من التوكن:", (err as Error).message);
     process.exit(1);
   }
 
+  // الوضع: Polling (محلي) أو Webhook (استضافة) — على Vercel نستخدم مسار الويب
+  const usePolling = process.env.BOT_POLLING !== "false";
   if (usePolling) {
     await bot.launch();
     console.log("✅ البوت يعمل بوضع Polling");
   } else {
-    const secret = process.env.BOT_WEBHOOK_SECRET ?? "apihunter-secret";
+    const domain = process.env.BOT_WEBHOOK_URL?.trim();
+    if (!domain) {
+      console.error(
+        "❌ BOT_WEBHOOK_URL غير محدد — في وضع Webhook حدّد رابط النشر، مثال: https://api-hunter-ai.vercel.app"
+      );
+      process.exit(1);
+    }
+    const secret = process.env.BOT_WEBHOOK_SECRET?.trim() || "apihunter-secret";
     await bot.launch({
-      webhook: {
-        domain: process.env.BOT_WEBHOOK_URL ?? "",
-        secretToken: secret,
-      },
+      webhook: { domain, path: "/api/bot", secretToken: secret },
     });
-    console.log("✅ البوت يعمل بوضع Webhook");
+    console.log(`✅ البوت يعمل بوضع Webhook على ${domain}/api/bot`);
   }
 
   // نشر القناة الدوري: فحص كل POLL_SECONDS للخدمات الجديدة
   if (CHANNEL_ID) {
-    console.log(`📣 مذياع القناة مفعّل: فحص كل ${POLL_SECONDS} ثانية.`);
+    console.log(` مذياع القناة مفعّل: فحص كل ${POLL_SECONDS} ثانية.`);
     const tick = async () => {
       const n = await publishPendingToChannel(bot, CHANNEL_ID);
       if (n > 0) console.log(`📨 المنشورات الجديدة المرسلة: ${n}`);

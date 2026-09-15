@@ -70,3 +70,14 @@ jobs:
       - name: ملخص النتيجة
         if: always()
         run: echo "انتهت الجولة. راجع السجل أعلاه لملخص الجولة."
+
+      - name: نشر المنشورات الجديدة إلى قناة تليجرام
+        if: always()
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.BOT_WEBHOOK_URL || 'https://api-hunter-ai.vercel.app' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "تخطي: CRON_SECRET غير مضبوط في الأسرار"; exit 0; fi
+          echo "طلب نشر للقناة عبر $APP_URL/api/cron/broadcast"
+          curl -sS -X POST "$APP_URL/api/cron/broadcast" \
+            -H "Authorization: Bearer $CRON_SECRET" || true

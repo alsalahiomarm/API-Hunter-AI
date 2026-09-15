@@ -7,6 +7,13 @@
   "env": {
     "NEXT_PUBLIC_APP_URL": "https://api-hunter-ai.vercel.app",
     "NEXT_PUBLIC_TELEGRAM_CHANNEL_URL": "https://t.me/APIHUNTERAI",
-    "NEXT_PUBLIC_TELEGRAM_BOT_URL": "https://t.me/API_HUNTER_AIbot"
-  }
+    "NEXT_PUBLIC_TELEGRAM_BOT_URL": "https://t.me/API_HUNTER_AIbot",
+    "BOT_POLLING": "false"
+  },
+  "crons": [
+    {
+      "path": "/api/cron/broadcast",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }

@@ -27,6 +27,7 @@ captured.json
 
 # Logs
 *.log
+*.done
 npm-debug.log*
 logs/
 *.tsbuildinfo

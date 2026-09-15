@@ -7,9 +7,23 @@ import { channelKeyboard, formatServiceFull, STATUS_LABEL } from "./formatter";
  * المذياع: يفحص قاعدة البيانات دورياً ويرسل المنشورات الجديدة للقناة.
  * يضمن عدم التكرار عبر جدول ChannelPost / الملف المحلي.
  */
+
+/** قائمة الخدمات التي لم تُنشر بعد (لمعاينة ما سيُنشر بدون إرسال فعلي) */
+export async function listPendingServices(): Promise<ServiceRecord[]> {
+  const services = await fetchServices();
+  const pending: ServiceRecord[] = [];
+  for (const s of services) {
+    if (await isAlreadyPosted(s.id)) continue;
+    pending.push(s);
+  }
+  return pending;
+}
+
 export async function publishPendingToChannel(
   bot: Telegraf,
-  channelId: string
+  channelId: string,
+  /** حد أقصى لعدد المنشورات في الدفعة الواحدة (لمنع إغراق القناة) */
+  max?: number
 ) {
   if (!channelId) {
     console.warn("⚠️ [broadcaster] TELEGRAM_CHANNEL_ID غير محدد - تخطي النشر.");
@@ -19,6 +33,7 @@ export async function publishPendingToChannel(
   let published = 0;
 
   for (const s of services) {
+    if (max && published >= max) break;
     if (await isAlreadyPosted(s.id)) continue;
 
     const statusBadge = STATUS_LABEL[s.status] ?? s.status;

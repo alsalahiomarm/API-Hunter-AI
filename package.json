@@ -20,6 +20,9 @@
     "draw:seed": "npm run db:push && npm run db:seed",
     "env:check": "tsx scripts/check-env.ts",
     "bootstrap": "tsx scripts/bootstrap-channel.ts",
+    "webhook:set": "tsx scripts/set-webhook.ts set",
+    "webhook:info": "tsx scripts/set-webhook.ts info",
+    "webhook:delete": "tsx scripts/set-webhook.ts delete",
     "hunt": "tsx apps/agent/src/index.ts --schedule",
     "hunt:once": "tsx apps/agent/src/index.ts --once",
     "bot": "tsx apps/bot/src/index.ts"

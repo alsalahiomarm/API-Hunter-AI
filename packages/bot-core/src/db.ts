@@ -30,8 +30,16 @@ async function readJson<T>(file: string, fallback: T): Promise<T> {
 }
 
 async function writeJson(file: string, data: unknown) {
-  await mkdir(dirname(file), { recursive: true }).catch(() => {});
-  await writeFile(file, JSON.stringify(data, null, 2), "utf-8");
+  try {
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    // بيئات بلا حالة (Vercel) نظام ملفاتها للقراءة فقط - نكتفي بالتحذير
+    console.warn(
+      "[bot-core/db] تعذّر الكتابة في الملف المحلي:",
+      (err as Error).message
+    );
+  }
 }
 
 // ---------------- جلب الخدمات ----------------
