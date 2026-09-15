@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: apihunter-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: apihunter
+      POSTGRES_PASSWORD: apihunter
+      POSTGRES_DB: apihunter
+    ports:
+      - "5432:5432"
+    volumes:
+      - apihunter_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apihunter -d apihunter"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  apihunter_pgdata:

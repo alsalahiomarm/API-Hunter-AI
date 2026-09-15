@@ -1,0 +1,39 @@
+{
+  "name": "@apihunter/db",
+  "version": "1.0.0",
+  "private": true,
+  "description": "قاعدة البيانات المشتركة (Prisma + PostgreSQL) ونماذج البيانات لمشروع API Hunter AI",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./seed-data": {
+      "types": "./src/seed-data.ts",
+      "default": "./src/seed-data.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx src/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "prisma": {
+    "seed": "tsx src/seed.ts"
+  }
+}

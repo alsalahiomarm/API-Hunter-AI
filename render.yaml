@@ -1,0 +1,59 @@
+# Render Blueprint - API Hunter AI
+# يبني خدمتي خلفية (Background Workers) من نفس المستودع.
+# ⚠️ القيم السرية تُترك فارغة (sync: false) وتُعَبَّأ من لوحة Render يدوياً
+#    حتى لا تُكشف أي مفاتيح داخل ملف الـ Blueprint ضمن المستودع.
+services:
+
+  # ---------- الخدمة الأولى: بوت تليجرام ----------
+  - type: worker
+    name: api-hunter-bot
+    runtime: node
+    plan: free
+    region: frankfurt
+    autoDeploy: true
+    buildCommand: npm install --include=dev && npm run db:generate
+    startCommand: npm run bot
+    envVars:
+      - key: NODE_ENV
+        value: production
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHANNEL_ID
+        sync: false
+      - key: TELEGRAM_ADMIN_IDS
+        sync: false
+      - key: BOT_POLLING
+        value: "true"
+        sync: false
+      - key: BOT_CHANNEL_POLL_SECONDS
+        value: "300"
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # ---------- الخدمة الثانية: محرك الاصطياد المجدول ----------
+  - type: worker
+    name: api-hunter-agent
+    runtime: node
+    plan: free
+    region: frankfurt
+    autoDeploy: true
+    buildCommand: npm install --include=dev && npm run db:generate && npx playwright install --with-deps chromium
+    startCommand: npm run hunt
+    envVars:
+      - key: NODE_ENV
+        value: production
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-flash-latest
+        sync: false
+      - key: AGENT_SCHEDULE_HOURS
+        value: "6"
+        sync: false

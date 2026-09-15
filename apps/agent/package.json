@@ -1,0 +1,24 @@
+{
+  "name": "@apihunter/agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "محرك الاصطياد الذكي: بحث دوري + كشط + تحليل ذكي + تحقق من الخدمات المجانية",
+  "scripts": {
+    "dev": "tsx watch src/index.ts --schedule",
+    "hunt": "tsx src/index.ts --once",
+    "hunt:once": "tsx src/index.ts --once",
+    "start": "tsx src/index.ts --schedule",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@apihunter/db": "*",
+    "dotenv": "^16.4.5",
+    "openai": "^4.76.0",
+    "playwright": "^1.49.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

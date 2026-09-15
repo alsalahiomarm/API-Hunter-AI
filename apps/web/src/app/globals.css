@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #070b14;
+  --card: #0d1524;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-night-950 text-slate-200 antialiased;
+  overflow-x: hidden;
+}
+
+/* خلفية شبكية مزخرفة */
+.hero-grid {
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(34, 211, 238, 0.12) 0, transparent 45%),
+    radial-gradient(circle at 80% 10%, rgba(167, 139, 250, 0.12) 0, transparent 45%),
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* شريط تمرير أنيق */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0a1019;
+}
+::-webkit-scrollbar-thumb {
+  background: #1a2740;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #22d3ee55;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.3);
+}
+
+@layer components {
+  .card-surface {
+    @apply rounded-2xl border border-white/10 bg-night-850 shadow-glow;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-bold text-night-950 transition hover:bg-primary/80 focus:outline-none focus:ring-2 focus:ring-primary/50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 rounded-xl border border-white/15 px-5 py-2.5 font-bold text-slate-200 transition hover:border-primary/50 hover:text-primary;
+  }
+  .input-dark {
+    @apply w-full rounded-xl border border-white/10 bg-night-800 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ring-inset;
+  }
+  .code-scroll {
+    @apply overflow-x-auto rounded-xl bg-night-950 p-4 text-[13px] leading-relaxed;
+  }
+}

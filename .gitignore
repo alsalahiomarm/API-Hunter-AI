@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Environment
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Prisma
+prisma/*.db
+packages/db/generated/
+
+# ملفات وقت التشغيل المحلية
+posted.json
+user-logs.json
+
+# Vercel
+.vercel/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+*.tsbuildinfo
+
+# Playwright
+apps/agent/.auth/
+test-results/
+playwright-report/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

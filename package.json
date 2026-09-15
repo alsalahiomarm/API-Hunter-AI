@@ -1,0 +1,36 @@
+{
+  "name": "api-hunter-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API Hunter AI - منصة وكيل ذكاء اصطناعي لاصطياد مفاتيح API المجانية + موقع ويب + بوت تليجرام",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @apihunter/web",
+    "dev:agent": "tsx watch apps/agent/src/index.ts --schedule",
+    "dev:bot": "tsx watch apps/bot/src/index.ts",
+    "build:web": "npm run build --workspace @apihunter/web",
+    "build": "npm run build --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace @apihunter/db",
+    "db:push": "npm run db:push --workspace @apihunter/db",
+    "db:seed": "npm run db:seed --workspace @apihunter/db",
+    "db:migrate": "npm run db:migrate --workspace @apihunter/db",
+    "draw:seed": "npm run db:push && npm run db:seed",
+    "env:check": "tsx scripts/check-env.ts",
+    "bootstrap": "tsx scripts/bootstrap-channel.ts",
+    "hunt": "tsx apps/agent/src/index.ts --schedule",
+    "hunt:once": "tsx apps/agent/src/index.ts --once",
+    "bot": "tsx apps/bot/src/index.ts"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "esbuild@0.28.2": true,
+    "prisma@5.22.0": true
+  }
+}

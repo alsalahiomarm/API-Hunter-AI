@@ -1,0 +1,80 @@
+// API Hunter AI - مخطط قاعدة البيانات (Supabase / PostgreSQL + Prisma)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- التصنيفات ----------
+enum Category {
+  AI_MODELS      // نماذج الذكاء الاصطناعي (LLMs, صور, صوت)
+  SEARCH_TOOLS   // أدوات البحث في الإنترنت (Tavily, Serper, Exa...)
+  AUDIO_IMAGE    // معالجة الصوت والنصوص وتحويلها
+  DATABASES      // قواعد البيانات والتخزين
+  DEV_TOOLS      // أدوات التطوير والبنية البرمجية
+  OTHER          // خدمات أخرى
+}
+
+// ---------- حالة الخدمة ----------
+enum ServiceStatus {
+  FREE_TIER    // مجاني بالكامل
+  FREE_CREDIT  // رصيد مجاني عند التسجيل
+  TRIAL        // تجربة مؤقتة
+  PENDING      // بانتظار التحقق
+  VERIFIED     // تم التحقق
+  FAILED       // فشل التحقق
+}
+
+// ---------- الخدمات المكتشفة ----------
+model ApiService {
+  id                String         @id @default(cuid())
+  name              String
+  slug              String         @unique
+  provider          String         // اسم الشركة المقدمة
+  category          Category       @default(OTHER)
+  description       String         @db.Text
+  freeTierDetails   Json           // { monthlyRequests, dailyRequests, freeCredits, rateLimit, models[], notes, requiresCard }
+  activationLink    String         // رابط التسجيل للحصول على المفتاح
+  documentationLink String         // رابط التوثيق البرمجي
+  codeExample       String?        @db.Text // مثال كود Python/JavaScript
+  status            ServiceStatus  @default(PENDING)
+  verifiedAt        DateTime?
+  sourceUrl         String?        // المصدر الذي اكتُشفت منه
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  channelPosts      ChannelPost[]
+  @@index([category, status])
+  @@index([createdAt])
+}
+
+// ---------- منشورات القناة (لمنع التكرار) ----------
+model ChannelPost {
+  id        String     @id @default(cuid())
+  serviceId String
+  apiService ApiService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  chatId    String     // معرف القناة
+  messageId Int        // معرف الرسالة المرسلة
+  createdAt DateTime   @default(now())
+
+  @@unique([chatId, messageId])
+  @@index([serviceId])
+}
+
+// ---------- استفسارات مستخدمي البوت ----------
+model UserLog {
+  id         String    @id @default(cuid())
+  telegramId String
+  firstName  String?
+  username   String?
+  query      String    @db.Text
+  intent     String?   // التصنيف المستنتج (NLU)
+  response   Json      // ملخص رد البوت (أسماء الخدمات المرتجعة)
+  createdAt  DateTime  @default(now())
+
+  @@index([telegramId, createdAt])
+}

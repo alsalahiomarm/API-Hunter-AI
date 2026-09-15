@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "npm install",
+  "buildCommand": "npm run db:generate && npm run build:web",
+  "outputDirectory": "apps/web/.next",
+  "env": {
+    "NEXT_PUBLIC_APP_URL": "https://api-hunter-ai.vercel.app",
+    "NEXT_PUBLIC_TELEGRAM_CHANNEL_URL": "https://t.me/APIHUNTERAI",
+    "NEXT_PUBLIC_TELEGRAM_BOT_URL": "https://t.me/API_HUNTER_AIbot"
+  }
+}
