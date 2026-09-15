@@ -7,7 +7,9 @@
 | 🖥️ الموقع (لوحة التحكم) | Next.js 15 (App Router) + Tailwind CSS + Lucide Icons |
 | 🦾 محرك الاصطياد | Node.js/TypeScript + Playwright + OpenAI/Gemini للتحليل |
 | 🗄️ قاعدة البيانات | Supabase (PostgreSQL) + Prisma ORM |
-| ✈️ البوت والقناة | Telegraf |
+| ✈️ البوت والقناة | Telegraf — وضع **Webhook على Vercel** أو Polling محلي |
+| ☁️ الاستضافة | **Vercel** (الموقع + بوت الويب هوك) — مجاني 100% |
+| ⏰ الاصطياد المجدول | **GitHub Actions** كل 6 ساعات — مجاني للمستودعات العامة |
 
 ---
 
@@ -16,11 +18,14 @@
 ```
 API-HunterAI/
 ├── apps/
-│   ├── web/        # موقع Next.js (لوحة تحكم داكنة + بحث + فلاتر)
+│   ├── web/        # موقع Next.js + مسار Webhook البوت (app/api/bot) + مسار نشر القناة
 │   ├── agent/      # الوكيل: كشط + تحليل ذكي + تحقق + حفظ
-│   └── bot/        # بوت تليجرام: نشر القناة + محادثات NLU
-└── packages/
-    └── db/         # Prisma Schema + عميل البيانات + بيانات بذر
+│   └── bot/        # مغلّف تشغيل البوت محلياً (Polling / Webhook)
+├── packages/
+│   ├── db/         # Prisma Schema + عميل البيانات + بيانات بذر
+│   └── bot-core/   # المنطق المشترك للبوت (أوامر + NLU + تنسيق + نشر القناة)
+├── scripts/        # check-env + bootstrap-channel + set-webhook
+└── .github/workflows/  # hunt (كل 6 ساعات) + webhook (ربط تلقائي بعد النشر)
 ```
 
 ---
@@ -109,13 +114,26 @@ npm run hunt:once -- --sources=github-public-apis,hn-free-api --limit=10 --skip-
 ```env
 TELEGRAM_BOT_TOKEN="123456:AAF-..."
 TELEGRAM_CHANNEL_ID="123456789"        # أو -100123456789 للخاصة
-BOT_POLLING="true"
+BOT_POLLING="false"                    # false = Webhook على Vercel | true = Polling محلي
+BOT_WEBHOOK_URL="https://api-hunter-ai.vercel.app"
+BOT_WEBHOOK_SECRET="سلسلة-عشوائية"
+CRON_SECRET="سلسلة-عشوائية"
 BOT_CHANNEL_POLL_SECONDS="300"
 ```
 
 4. شغّل البوت:
+
+**محلياً (Polling):**
 ```bash
+npm run webhook:delete   # تأكد أنه لا يوجد ويب هوك مفعّل (وإلا ظهر 409 Conflict)
 npm run bot
+```
+
+**سحابياً على Vercel (Webhook — مثالي للمجاني 24/7 بدون جهاز):**
+```bash
+vercel --prod --yes          # انشر الموقع (فيه مسار /api/bot)
+npm run webhook:set -- --wait # اربط تليجرام بالمسار
+npm run webhook:info          # تحقق: URL + «لا أخطاء مسجّلة»
 ```
 
 الآن:
@@ -171,4 +189,24 @@ npm run bot          # بوت تليجرام
 npm run db:generate  # توليد Prisma Client
 npm run db:push      # مزامنة الجداول
 npm run db:seed      # إدخال البيانات التجريبية
+npm run draw:seed    # db:push + db:seed معاً
+npm run env:check    # فحص المتغيرات + اتصال قاعدة البيانات + مفتاح Gemini
+npm run bootstrap    # ترقية المدير + رسالة ترحيب في القناة
+npm run webhook:set  # ربط Webhook تليجرام برابط Vercel
+npm run webhook:info # حالة الويب هوك
+npm run webhook:delete # إلغاء الربط (للعودة إلى Polling)
 ```
+
+---
+
+## ☁️ النشر المجاني (Vercel + Supabase + GitHub Actions)
+
+| الطبقة | المنصة | ملاحظات |
+|---|---|---|
+| الموقع | **Vercel** | `vercel.json` يضبط البناء والمخرجات |
+| البوت | **Vercel** | مسار `POST /api/bot` لاستقبال تحديثات تليجرام |
+| قاعدة البيانات | **Supabase** | PostgreSQL مجاني |
+| الاصطياد الدوري | **GitHub Actions** | `.github/workflows/hunt.yml` كل 6 ساعات |
+| ربط الويب هوك | **GitHub Actions** | `.github/workflows/webhook.yml` بعد كل نشر |
+
+📘 الدليل الكامل خطوة بخطوة (مع حل المشاكل الشائعة): **[DEPLOYMENT_STEPS.md](./DEPLOYMENT_STEPS.md)**

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBot, publishPendingToChannel, listPendingServices } from "@apihunter/bot-core";
+import {
+  getBot,
+  publishPendingToChannel,
+  listPendingServices,
+  isDatabaseReachable,
+} from "@apihunter/bot-core";
 
 /**
  * مذياع القناة: ينشر أي خدمات جديدة (لم تُنشر سابقاً) إلى قناة تليجرام.
@@ -54,9 +59,22 @@ async function run(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         dryRun: true,
+        databaseReachable: await isDatabaseReachable(),
         pendingCount: pending.length,
         pending: pending.slice(0, 20).map((s) => s.name),
       });
+    }
+
+    // حماية من إغراق القناة: لا نشر بدون قاعدة بيانات (لأن منع التكرار يعتمد عليها)
+    if (!(await isDatabaseReachable())) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "قاعدة البيانات غير متاحة — تم إيقاف النشر لمنع تكرار المنشورات.",
+          hint: "اضبط DATABASE_URL في متغيرات Vercel (خطوة 1️⃣ في DEPLOYMENT_STEPS.md).",
+        },
+        { status: 503 }
+      );
     }
 
     const published = await publishPendingToChannel(bot, channelId, limit);

@@ -1,122 +1,168 @@
-# 🚀 DEPLOYMENT_STEPS — آخر 3 خطوات يدوية لإكمال النشر
+# 🚀 دليل النشر النهائي — API Hunter AI (Vercel فقط، 0$)
 
-> كل ما يمكن أتمتته تم إنشاؤه جاهزاً في المستودع:
-> `vercel.json` (Vercel) + `render.yaml` (Render) + سكربتات `env:check` و`bootstrap`.
-
----
-
-## ✅ تم إنجازه فعلاً (لا يحتاج تدخلك)
+> **البنية المعتمدة:** موقع Next.js + بوت تليجرام بوضع Webhook يعملان على **Vercel** (مجاناً)،
+> البيانات على **Supabase**، وجولات الاصطياد المجدولة على **GitHub Actions** (مجاناً للمستودعات العامة).
+> لا حاجة إلى Render ولا إلى أي سيرفر دائم.
 
 | العنصر | الحالة |
 |---|---|
 | مستودع GitHub | `alsalahiomarm/API-Hunter-AI` — https://github.com/alsalahiomarm/API-Hunter-AI |
-| مشروع Vercel | `lolomama/api-hunter-ai` |
-| الموقع الحيّ | **https://api-hunter-ai.vercel.app** (نُشر عبر Vercel CLI — يعمل ✅) |
-| متغيرات Vercel (Production) | `DATABASE_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHANNEL_ID`, `TELEGRAM_ADMIN_IDS` |
-| فحص محلي | `env:check` ✅ / `db:generate` ✅ / `build` ✅ (EXIT=0) |
-| جولة اصطياد حقيقية | ✅ فحص 1003 مدخل وتحليل بوضع **Gemini** (ثقة 0.85) |
+| مشروع Vercel | `lolomama/api-hunter-ai` → **https://api-hunter-ai.vercel.app** |
+| مسار تحديثات البوت | `POST /api/bot` (محمي بـ `BOT_WEBHOOK_SECRET`) ✅ منشور |
+| مسار نشر القناة | `GET/POST /api/cron/broadcast` (محمي بـ `CRON_SECRET`) ✅ منشور |
+| جولة الاصطياد | `.github/workflows/hunt.yml` — كل 6 ساعات ✅ نشط |
+| ربط الويب هوك آلياً | `.github/workflows/webhook.yml` + `npm run webhook:set` ✅ |
+| أسرار GitHub | `TELEGRAM_BOT_TOKEN`, `BOT_WEBHOOK_SECRET`, `CRON_SECRET`, `GEMINI_API_KEY` ✅ |
+| **المتبقي** | إضافة **`DATABASE_URL`** من Supabase (3 مواضع: `.env` + Vercel + GitHub) |
 
 ---
 
-## 1️⃣ لصق رابط قاعدة بيانات Supabase
+## 1️⃣ ربط Supabase (الخطوة الوحيدة المتبقية)
 
-1. افتح [supabase.com](https://supabase.com) → سجّل الدخول → أنشئ مشروعاً جديداً.
-2. من الشريط الجانبي: **Project Settings → Database → Connection string**.
-3. انسخ الـ **URI** مع وضع كلمة المرور مكان `[YOUR-PASSWORD]`.
-4. تأكد أن الرابط ينتهي بـ `?schema=public` (أضفها إن لم تكن موجودة).
-5. الصق الرابط في ملف `.env` في جذر المشروع مكان قيمة `DATABASE_URL`.
-   ثم حدّث نسخة Vercel:
-   `vercel env rm DATABASE_URL production -y` ثم `vercel env add DATABASE_URL production`.
-6. نفّذ (ينشئ الجداول ويضخ البيانات التجريبية):
+1. افتح مشروعك في [supabase.com](https://supabase.com) (ref: `azhpxctczaledmttmvzm`).
+2. **Project Settings → Database → Connection string → URI** وانسخ الرابط مع كلمة المرور.
+3. تأكد من إضافة `?schema=public` في نهاية الرابط إن لم تكن موجودة.
+4. ضعه في `.env` محلياً ثم شغّل:
 
 ```bash
-npm run env:check    # يتحقق من اكتمال المفاتيح
-npm run draw:seed    # prisma db push + بذر البيانات
+npm run env:check     # يجب أن يظهر: ✅ الاتصال بقاعدة البيانات ناجح
+npm run draw:seed     # ينشئ الجداول (prisma db push) + يزرع البيانات التجريبية
+npm run hunt:once -- --sources=github-public-apis --limit=5   # جولة تجريبية حقيقية
 ```
+
+5. حدّث النسخ السحابية:
+
+```bash
+# Vercel
+vercel env rm DATABASE_URL production -y
+vercel env add DATABASE_URL production     # الصق الرابط ثم Enter
+vercel --prod --yes
+
+# GitHub Actions (سِرّ للمحرك والعمل المجدول)
+gh secret set DATABASE_URL
+```
+
+> 💡 بديل: أي PostgreSQL مجاني آخر (Neon / Supabase) يعمل بنفس الطريقة.
 
 ---
 
-## 2️⃣ تشغيل التهيئة (البوت + القناة + المدير)
+## 2️⃣ متغيرات البيئة (مرجع كامل)
 
-بعد نجاح الخطوة 1، نفّذ مرة واحدة لترقية حسابك
-(`1665333044`) إلى **مدير القناة** وإرسال رسالة الترحيب:
+| المتغير | محلي `.env` | Vercel | GitHub Actions |
+|---|---|---|---|
+| `DATABASE_URL` | ✅ | سِرّ | سِرّ |
+| `GEMINI_API_KEY` | ✅ | سِرّ | سِرّ ✅ مضبوط |
+| `GEMINI_MODEL` | ✅ | سِرّ | متغير ✅ مضبوط |
+| `TELEGRAM_BOT_TOKEN` | ✅ | سِرّ | سِرّ ✅ مضبوط |
+| `TELEGRAM_CHANNEL_ID` | ✅ | سِرّ | — |
+| `TELEGRAM_ADMIN_IDS` | ✅ | سِرّ | — |
+| `BOT_POLLING` | `false` | `false` | — |
+| `BOT_WEBHOOK_URL` | ✅ | ✅ | متغير ✅ مضبوط |
+| `BOT_WEBHOOK_SECRET` | ✅ | سِرّ | سِرّ ✅ مضبوط |
+| `CRON_SECRET` | ✅ | سِرّ | سِرّ ✅ مضبوط |
+| `AGENT_CONCURRENCY` | `2` | — | داخل سير العمل |
+| `AI_MAX_ATTEMPTS` | `3` | — | داخل سير العمل |
+
+> ⚠️ لا ترفع `.env` إلى Git أبداً (مستثنى في `.gitignore`).
+
+---
+
+## 3️⃣ ربط الويب هوك تلقائياً (بعد كل نشر)
+
+السكربت جاهز ويُستدعى آلياً من سير عمل GitHub عند أي تعديل على مسار البوت:
+
+```bash
+npm run webhook:set                 # ربط الويب هوك برابط Vercel
+npm run webhook:set -- --wait       # انتظار اكتمال النشر ثم الربط (يستخدمه الـ CI)
+npm run webhook:info                # عرض الحالة وعدد التحديثات المعلّقة
+npm run webhook:delete              # إلغاء الربط (للعودة إلى Polling محلي)
+```
+
+التحقق من نجاح الربط: يفتح `npm run webhook:info` ويجب أن يظهر
+`URL: https://api-hunter-ai.vercel.app/api/bot` و `لا أخطاء مسجّلة`. ثم أرسل `/start` للبوت
+في تليجرام وسيجيب مباشرة (بدون تشغيل أي جهاز).
+
+---
+
+## 4️⃣ تجهيز القناة + المدير (مرة واحدة)
 
 ```bash
 npm run bootstrap
 ```
 
-> توقع الناتج: `✅ أصبح المستخدم 1665333044 مديراً في القناة`
-> إن ظهرت رسالة خطأ: افتح القناة واجعل البوت `@API_HUNTER_AIbot` **مديراً**
-> من: إعدادات القناة → مدراء → إضافة مدير → ابحث عن البوت.
+يقوم بـ: التحقق من البوت والقناة، رفع حسابك (`1665333044`) إلى **مدير القناة** إن أمكن،
+وإرسال رسالة ترحيب إلى القناة. إن ظهر خطأ صلاحيات:
+افتح القناة → **إدارة → المدراء → إضافة مدير → `@API_HUNTER_AIbot`**.
+
+للتجربة الآمنة قبل النشر الفعلي للقناة (بدون إرسال أي رسالة):
+
+```bash
+# قائمة ما سيُنشر فقط
+curl "https://api-hunter-ai.vercel.app/api/cron/broadcast?dry=1&secret=$CRON_SECRET"
+
+# نشر دفعة محدودة (خدمة واحدة مثلاً) لتجنب الإغراق
+curl -X POST "https://api-hunter-ai.vercel.app/api/cron/broadcast?limit=1" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+---
+
+## 5️⃣ التشغيل المحلي (تطوير فقط)
+
+> ⚠️ لا يمكن تشغيل Webhook و Polling في الوقت نفسه لنفس البوت (يظهر خطأ
+> `409 Conflict: can't use getUpdates method while webhook is active`).
+
+```bash
+npm run webhook:delete     # ألغِ الربط مؤقتاً
+npm run bot                # شغّل البوت محلياً بوضع Polling
+# ... انتهيت من التطوير:
+npm run webhook:set        # أعد الربط برابط Vercel
+```
+
+بيئة التطوير للموقع:
+
+```bash
+npm run dev:web            # http://localhost:3000
+npm run dev:agent          # المحرك بوضع الجدولة محلياً
+```
 
 ---
 
-## 3️⃣ ربط منصتي Vercel و Render بالمستودع على GitHub
+## 6️⃣ (اختياري) Render — للراغبين بالدفع فقط
 
-### أ) Vercel (موقع اللوحة)
-
-المشروع **منشور بالفعل** والمتغيرات مضافة. المتبقي فقط ربط Git للنشر التلقائي عند كل `push`:
-
-1. افتح [vercel.com](https://vercel.com) → مشروع **api-hunter-ai** → **Settings → Git**.
-2. اضغط **Connect Git Repository** واختر **`alsalahiomarm/API-Hunter-AI`**.
-   (قد يطلب تثبيت تطبيق Vercel على حساب GitHub مرة واحدة — هذا هو سبب فشل `vercel git connect` من الطرفية.)
-3. بعد الربط، أي `git push` على `main` سيُنشر تلقائياً.
-4. للتحديث الفوري من الطرفية في أي وقت: `vercel --prod --yes`
-
-> ملاحظة: الموقع يعمل الآن حتى بدون Supabase لأنه يعرض البيانات التجريبية كاحتياط،
-> لكن ربط Supabase إلزامي لعرض الخدمات التي يصطادها المحرك تلقائياً.
-
-### ب) Render (البوت + محرك الاصطياد على مدار الساعة)
-
-`render.yaml` ينشئ خدمتَي خلفية جاهزتين (البوت + المحرك المجدول):
-
-1. افتح [render.com](https://render.com) → سجّل الدخول.
-2. **New → Blueprint** → اربط حساب **GitHub** (تثبيت تطبيق Render مرة واحدة) ثم اختر مستودع **API-Hunter-AI**.
-3. Render سيكتشف `render.yaml` ويعرض خدمتي `api-hunter-bot` و`api-hunter-agent`.
-4. اضغط **Apply**، ثم من كل خدمة → **Environment** أضف القيم (القيم السرية لا تُلتزم في Git):
-   - `DATABASE_URL` = رابط Supabase
-   - `TELEGRAM_BOT_TOKEN` = توكن البوت
-   - `TELEGRAM_CHANNEL_ID` = `-1003720665169`
-   - `TELEGRAM_ADMIN_IDS` = `1665333044`
-   - `GEMINI_API_KEY` = المفتاح
-   - `GEMINI_MODEL` = `gemini-flash-latest`
-   - `AGENT_CONCURRENCY` = `2` (لتقليل ضغط الطبقة المجانية)
-   - `AI_MAX_ATTEMPTS` = `3`
-5. أعد تشغيل الخدمتين. البوت يعمل بوضع Polling، والمحرك يجري جولة فورية ثم يكرر كل `6` ساعات.
-6. للتحقق من عمل توكن اقتراع تليجرام: سجلات `api-hunter-bot` ستطبع `🤖 البوت يعمل الآن`.
+Render لا توفّر خطة Free للـ Background Workers (تبدأ ~$7/شهر لكل خدمة).
+إن أردت تشغيل البوت بـ **Polling** على Render بدل الويب هوك:
+`render.yaml` جاهز → **New → Blueprint → اختر المستودع → Apply** ثم أضف الأسرار.
+في هذه الحالة يجب تشغيل `BOT_POLLING=true` وحذف الويب هوك: `npm run webhook:delete`.
 
 ---
 
-## 🆓 المسار المجاني 100% (بدون Render)
+## ✅ فحص ما بعد النشر
 
-إذا لم ترغب بدفع اشتراك Render (Background Worker من ~$7/شهر لكل خدمة):
-
-1. **المحرك (مجاني بالكامل عبر GitHub Actions)** — موجود جاهزاً في `.github/workflows/hunt.yml`:
-   - افتح المستودع → **Settings → Secrets and variables → Actions → New repository secret**.
-   - أضف سِرّين: `DATABASE_URL` (رابط Supabase) و `GEMINI_API_KEY`.
-   - (اختياري) من تبويب **Variables** أضف `GEMINI_MODEL` = `gemini-flash-latest`.
-   - من تبويب **Actions** اختر «Hunt (جولة اصطياد مجدولة)» → **Run workflow** للتشغيل اليدوي.
-   - بعد ذلك يعمل تلقائياً **كل 6 ساعات** ويخزّن النتائج في Supabase (المستودع عام = دقائق مجانية غير محدودة).
-2. **البوت** — شغّله محلياً على جهازك (أمر واحد، يعمل طالما الجهاز مفتوح):
-   ```bash
-   npm run bootstrap   # مرة واحدة: ترقية المدير + رسالة ترحيب في القناة
-   npm run bot
-   ```
-   > البوت يفحص القناة كل `BOT_CHANNEL_POLL_SECONDS` (300 ثانية افتراضياً) وينشر الجديد تلقائياً.
-
-> بهذا تحصل على منظومة كاملة تعمل بـ 0$: الموقع على Vercel + البيانات على Supabase +
-> الاصطياد على GitHub Actions + البوت محلياً.
+| العنصر | الأمر / الطريقة | النتيجة المتوقعة |
+|---|---|---|
+| الموقع | افتح https://api-hunter-ai.vercel.app | لوحة الخدمات تعمل (200) |
+| صحة مسار البوت | `curl https://api-hunter-ai.vercel.app/api/bot` | `{"ok":true,"mode":"webhook",...}` |
+| ربط الويب هوك | `npm run webhook:info` | `URL: .../api/bot` و«لا أخطاء مسجّلة» |
+| حماية المسار | `curl -X POST .../api/bot` (بدون سرّ) | `401 unauthorized` |
+| البوت | أرسل `/start` لـ `@API_HUNTER_AIbot` | يرد بالقائمة ولوحة التصنيفات |
+| القناة | `curl ".../api/cron/broadcast?dry=1&secret=$CRON_SECRET"` | قائمة الخدمات المعلّقة |
+| النشر للقناة | `curl -X POST ".../api/cron/broadcast?limit=1" -H "Authorization: Bearer $CRON_SECRET"` | `{"ok":true,"published":1}` |
+| المحرك | GitHub → Actions → «Hunt» | جولة ناجحة كل 6 ساعات |
+| البيانات | `npm run env:check` | `✅ الاتصال بقاعدة البيانات ناجح` |
 
 ---
 
-| العنصر | الطريقة |
-|---|---|
-| الموقع | زيارة https://api-hunter-ai.vercel.app ومشاهدة لوحة الخدمات |
-| نقطة البيانات | `GET https://api-hunter-ai.vercel.app/api/stats` تُرجع JSON بالأرقام |
-| البوت | مراسلة `@API_HUNTER_AIbot` بأمر `/start` أو `/latest` |
-| القناة | التأكد أن الرسائل تُنشر على `https://t.me/APIHUNTERAI` |
-| المحرك | سجل Render الخاص بـ `api-hunter-agent` يُظهر «بدء دورة مجدولة» |
+## 🛠️ حل المشاكل الشائعة
 
-> 💡 **ملاحظة**: لا تُرفع مفاتيح القيم السرية في ملفات النشر أبداً —
-> `sync: false` في `render.yaml` متعمدة لتلصق القيم من لوحة Render فقط،
-> و`.env` مستثنى من Git.
+| المشكلة | السبب | الحل |
+|---|---|---|
+| `409 Conflict: can't use getUpdates and webhook together` | تشغيل Polling مع ويب هوك مفعّل | `npm run webhook:delete` قبل `npm run bot` |
+| `/api/bot` يرد `401` | سرّ الويب هوك غير مطابق | تأكد أن `BOT_WEBHOOK_SECRET` نفسه في `.env` و Vercel و GitHub ثم `npm run webhook:set` |
+| القناة لا تستقبل منشورات | البوت ليس مديراً في القناة | إدارة القناة → المدراء → إضافة `@API_HUNTER_AIbot` (مع صلاحية النشر) |
+| `chat not found` عند الرد على المستخدم | المستخدم لم يبدأ البوت بعد | افتح `@API_HUNTER_AIbot` واضغط **Start** |
+| الموقع يعرض بيانات تجريبية فقط | `DATABASE_URL` غير مضبوط/غير صحيح | نفّذ الخطوة 1️⃣ ثم `vercel env add DATABASE_URL production` وأعد النشر |
+| فشل تحليل AI (`429`/`503`) | حصة Gemini المجانية (طلبات/دقيقة) | يعمل تلقائياً بالوضع القواعدي؛ خفّض `AGENT_CONCURRENCY` وارفع `AI_MAX_ATTEMPTS` |
+| `prisma client not generated` | لم يُنشأ العميل بعد التثبيت | `npm run db:generate` |
+
+> 💡 كل الأسرار تُدار من `.env` محلياً، ومن **Vercel → Settings → Environment Variables**،
+> ومن **GitHub → Settings → Secrets and variables → Actions**. لا تُكتب أي مفاتيح في الملفات المرفوعة.

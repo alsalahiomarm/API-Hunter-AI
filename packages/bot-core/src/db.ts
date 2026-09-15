@@ -42,6 +42,21 @@ async function writeJson(file: string, data: unknown) {
   }
 }
 
+/**
+ * فحص فعلي لقابلية الوصول لقاعدة البيانات.
+ * يُستخدم قبل النشر للقناة لضمان عمل منع التكرار (ChannelPost) وعدم تكرار المنشورات.
+ */
+export async function isDatabaseReachable(): Promise<boolean> {
+  if (!isDbConfigured()) return false;
+  try {
+    const db = await import("@apihunter/db");
+    await db.prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ---------------- جلب الخدمات ----------------
 export async function fetchServices(filter?: {
   category?: Category | "";
