@@ -1,1 +1,0 @@
-feat(broadcast): guard against channel spam (require reachable DB) + docs and README for Vercel-only free setup
