@@ -11,7 +11,11 @@ import { dedupeKey } from "./validator";
  */
 
 const FALLBACK_FILE = join(process.cwd(), "captured.json");
-const DB_CONFIGURED = Boolean(process.env.DATABASE_URL);
+
+/** تُقيَّم وقت التنفيذ: .env يُحمَّل في index.ts بعد استيراد هذه الوحدة */
+function isDbConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL?.trim());
+}
 
 export interface PersistOutcome {
   inserted: HuntResult[];
@@ -22,7 +26,7 @@ export async function persistHuntResults(results: HuntResult[]): Promise<Persist
   const inserted: HuntResult[] = [];
   let duplicates = 0;
 
-  if (DB_CONFIGURED) {
+  if (isDbConfigured()) {
     try {
       const db = await import("@apihunter/db");
       for (const r of results) {

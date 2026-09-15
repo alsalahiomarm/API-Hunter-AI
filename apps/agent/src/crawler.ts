@@ -100,6 +100,15 @@ async function crawlWithPlaywright(src: Source): Promise<RawEntry[]> {
 }
 
 // ---------------- المحللات (Parsers) ----------------
+/** إزالة صيغة روابط الماركداون: [الاسم](الرابط) -> الاسم */
+export function stripMarkdownLinks(text: string): string {
+  return text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function parsePublicApis(md: string, src: Source): RawEntry[] {
   const entries: RawEntry[] = [];
   // سطور الجدول: | Name | Description | Auth | HTTPS | CORS |
@@ -107,14 +116,16 @@ function parsePublicApis(md: string, src: Source): RawEntry[] {
     if (!line.trim().startsWith("|")) continue;
     const cols = line.split("|").map((c) => c.trim().slice(0, 220));
     if (cols.length < 6) continue;
-    const [, name, desc, auth] = cols;
-    if (!name || !desc || !auth) continue;
+    const [, rawName, desc, auth] = cols;
+    if (!rawName || !desc || !auth) continue;
     const isKey = /api[Kk]ey|OAuth|api_k/i.test(auth);
     const freeHint = /free|trial|credit|no[- ]?plan|community/i.test(line);
     if (!isKey && !freeHint) continue;
-    // استرجاع رابط السطر من الماركداون إن وُجد
-    const linkMatch = line.match(/\]\((https?:\/\/[^)]+)\)/);
-    const url = linkMatch?.[1] ?? `https://github.com/public-apis/public-apis#${name}`;
+    // الرابط: أولوية لرابط عمود الاسم ثم أي رابط في السطر
+    const nameLink = rawName.match(/\]\((https?:\/\/[^)]+)\)/)?.[1];
+    const lineLink = line.match(/\]\((https?:\/\/[^)]+)\)/)?.[1];
+    const name = stripMarkdownLinks(rawName).slice(0, 90);
+    const url = nameLink ?? lineLink ?? `https://github.com/public-apis/public-apis#${name}`;
     entries.push({ title: name, url, source: src.label, text: desc });
   }
   return entries;

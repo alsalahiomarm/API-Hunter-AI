@@ -12,7 +12,11 @@ import { join, dirname } from "path";
 
 const POSTED_FILE = join(process.cwd(), "posted.json");
 const LOG_FILE = join(process.cwd(), "user-logs.json");
-const DB_CONFIGURED = Boolean(process.env.DATABASE_URL);
+
+/** تُقيَّم وقت التنفيذ: .env يُحمَّل في index.ts بعد استيراد هذه الوحدة */
+function isDbConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL?.trim());
+}
 
 interface PostedLog {
   serviceIds: string[];
@@ -37,7 +41,7 @@ export async function fetchServices(filter?: {
 }): Promise<ServiceRecord[]> {
   let services: ServiceRecord[] = [];
 
-  if (DB_CONFIGURED) {
+  if (isDbConfigured()) {
     try {
       const db = await import("@apihunter/db");
       const rows = await db.prisma.apiService.findMany({
@@ -73,7 +77,7 @@ export async function fetchLatest(limit = 3): Promise<ServiceRecord[]> {
 
 // ---------------- سجل منشورات القناة (منع التكرار) ----------------
 export async function isAlreadyPosted(serviceId: string): Promise<boolean> {
-  if (DB_CONFIGURED) {
+  if (isDbConfigured()) {
     try {
       const db = await import("@apihunter/db");
       const post = await db.prisma.channelPost.findFirst({
@@ -91,7 +95,7 @@ export async function markPosted(
   chatId: string,
   messageId: number
 ) {
-  if (DB_CONFIGURED) {
+  if (isDbConfigured()) {
     try {
       const db = await import("@apihunter/db");
       await db.prisma.channelPost.create({
@@ -127,7 +131,7 @@ export async function logUserQuery(params: {
   matched: string[];
 }) {
   const { telegramId, firstName, username, query, intent, matched } = params;
-  if (DB_CONFIGURED) {
+  if (isDbConfigured()) {
     try {
       const db = await import("@apihunter/db");
       await db.prisma.userLog.create({

@@ -3,7 +3,7 @@ import { resolve } from "path";
 import { existsSync } from "fs";
 import { runHunt } from "./hunter";
 import { startScheduler } from "./scheduler";
-import { AI_CONFIGURED } from "./analyzer";
+import { isAIConfigured } from "./analyzer";
 
 // ----------------------------------------------------------
 // تحميل متغيرات البيئة من apps/agent ثم من جذر المشروع
@@ -73,6 +73,7 @@ async function main() {
     sources,
     maxEntries,
     skipLinkCheck: flags["skip-link-check"] === true,
+    concurrency: Number(flags.concurrency ?? process.env.AGENT_CONCURRENCY ?? 4) || 4,
   };
 
   console.log("");
@@ -85,7 +86,8 @@ async function main() {
   console.log("   API Hunter AI - محرك الاصطياد الذكي v1.0");
   console.log("");
 
-  console.log(`🧠 وضع التحليل: ${AI_CONFIGURED ? "الذكاء الاصطناعي (AI)" : "قواعدي (Heuristic)"}`);
+  const aiOn = isAIConfigured();
+  console.log(`🧠 وضع التحليل: ${aiOn ? `الذكاء الاصطناعي (${process.env.OPENAI_MODEL || process.env.GEMINI_MODEL || "gpt-4o-mini"})` : "قواعدي (Heuristic)"}`);
   console.log(`🗄️  قاعدة البيانات: ${process.env.DATABASE_URL ? "متاحة (Prisma/PostgreSQL)" : "غير محددة - تخزين ملف محلي"}`);
   console.log("");
 

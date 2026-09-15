@@ -13,7 +13,10 @@ export interface ServiceFilters {
   status?: ServiceStatus | "";
 }
 
-const DB_CONFIGURED = Boolean(process.env.DATABASE_URL);
+/** تُقيَّم وقت التنفيذ لتفادي اعتماد النتيجة على توقيت تحميل متغيرات البيئة */
+function isDbConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL?.trim());
+}
 
 function applyFilters(list: ServiceRecord[], f: ServiceFilters): ServiceRecord[] {
   const q = (f.search ?? "").trim().toLowerCase();
@@ -42,7 +45,7 @@ function applyFilters(list: ServiceRecord[], f: ServiceFilters): ServiceRecord[]
 export async function getAllServices(
   filters: ServiceFilters = {}
 ): Promise<ServiceRecord[]> {
-  if (DB_CONFIGURED) {
+  if (isDbConfigured()) {
     try {
       const db = await import("@apihunter/db");
       const rows = await db.prisma.apiService.findMany({

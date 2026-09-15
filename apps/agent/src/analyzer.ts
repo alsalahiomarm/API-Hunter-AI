@@ -1,5 +1,6 @@
 import type { Category, FreeTierDetails } from "@apihunter/db";
 import type { HuntResult, RawEntry } from "./types";
+import { stripMarkdownLinks } from "./crawler";
 
 /**
  * وحدة التحليل الذكي:
@@ -7,9 +8,14 @@ import type { HuntResult, RawEntry } from "./types";
  * 2) وضع Heuristic: استخراج قواعدي (regex) عند غياب المفاتيح.
  */
 
-export const AI_CONFIGURED = Boolean(
-  process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY
-);
+/**
+ * تُقيَّم وقت التنفيذ (lazy) وليس وقت الاستيراد:
+ * ملف .env يُحمَّل في index.ts بعد الاستيراد، لذا أي حساب في نطاق الوحدة
+ * سيعطي نتيجة خاطئة (false) دائماً.
+ */
+export function isAIConfigured(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY);
+}
 
 const CATEGORY_KEYWORDS: Record<Category, RegExp> = {
   AI_MODELS: /llm|gpt|chat|completion|language model|generative|inference|gemini|claude|llama|mistral|transformer/i,
@@ -41,9 +47,12 @@ export function analyzeHeuristic(entry: RawEntry): HuntResult | null {
   if (!blob) return null;
 
   const firstUrl = blob.match(/https?:\/\/[^\s)\]]+/i)?.[0] ?? entry.url;
-  const name = entry.title
-    .replace(/\s*-\s*.*$/i, "")
-    .replace(/\s*[:|,]\s*.*$/i, "")
+  // تنظيف العنوان: إزالة روابط الماركداون ثم قطع اللاحقة عند فاصل محاط بمسافات فقط
+  // (لا نقطع عند ":" داخل الروابط مثل https://)
+  const cleanTitle = stripMarkdownLinks(entry.title);
+  const name = cleanTitle
+    .replace(/\s+[|,]\s+.*$/i, "")
+    .replace(/\s+[-–—:]\s+.*$/i, "")
     .slice(0, 80)
     .trim();
 
@@ -143,7 +152,7 @@ function cleanJson(text: string): string {
 }
 
 export async function analyzeWithAI(entry: RawEntry): Promise<HuntResult | null> {
-  if (!AI_CONFIGURED) return null;
+  if (!isAIConfigured()) return null;
 
   const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || "";
   const baseUrl =
@@ -210,7 +219,7 @@ export async function analyzeWithAI(entry: RawEntry): Promise<HuntResult | null>
 }
 
 export async function analyzeEntry(entry: RawEntry): Promise<HuntResult | null> {
-  if (AI_CONFIGURED) {
+  if (isAIConfigured()) {
     const ai = await analyzeWithAI(entry);
     if (ai) return ai;
   }
