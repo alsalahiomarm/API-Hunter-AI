@@ -190,6 +190,7 @@ npm run db:generate  # توليد Prisma Client
 npm run db:push      # مزامنة الجداول
 npm run db:seed      # إدخال البيانات التجريبية
 npm run draw:seed    # db:push + db:seed معاً
+npm run db:link -- "postgresql://user:pass@host:5432/db"   # ربط قاعدة البيانات بأمر واحد (.env + Vercel + GitHub + seed)
 npm run env:check    # فحص المتغيرات + اتصال قاعدة البيانات + مفتاح Gemini
 npm run bootstrap    # ترقية المدير + رسالة ترحيب في القناة
 npm run webhook:set  # ربط Webhook تليجرام برابط Vercel

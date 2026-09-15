@@ -18,6 +18,7 @@
     "db:seed": "npm run db:seed --workspace @apihunter/db",
     "db:migrate": "npm run db:migrate --workspace @apihunter/db",
     "draw:seed": "npm run db:push && npm run db:seed",
+    "db:link": "tsx scripts/link-db.ts",
     "env:check": "tsx scripts/check-env.ts",
     "bootstrap": "tsx scripts/bootstrap-channel.ts",
     "webhook:set": "tsx scripts/set-webhook.ts set",

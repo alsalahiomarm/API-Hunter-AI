@@ -42,6 +42,16 @@ vercel --prod --yes
 gh secret set DATABASE_URL
 ```
 
+> ⚡ **الطريقة الأسرع — أمر واحد ينفّذ كل الخطوات أعلاه (1 → 5):**
+
+```bash
+npm run db:link -- "postgresql://postgres.<ref>:<PASSWORD>@<host>:6543/postgres?pgbouncer=true&connection_limit=1&schema=public"
+```
+
+السكربت `scripts/link-db.ts` يقوم تلقائياً بـ: التحقق من الاتصال فعلياً → تحديث `.env` → تحديث متغيّر Vercel (production) → تحديث سر GitHub Actions → تنفيذ `draw:seed`.
+
+خيارات إضافية: `--deploy` (إعادة نشر Vercel بعد الربط) · `--skip-vercel` / `--skip-gh` / `--skip-seed`.
+
 > 💡 بديل: أي PostgreSQL مجاني آخر (Neon / Supabase) يعمل بنفس الطريقة.
 
 ---
@@ -160,6 +170,8 @@ Render لا توفّر خطة Free للـ Background Workers (تبدأ ~$7/شه�
 | `/api/bot` يرد `401` | سرّ الويب هوك غير مطابق | تأكد أن `BOT_WEBHOOK_SECRET` نفسه في `.env` و Vercel و GitHub ثم `npm run webhook:set` |
 | القناة لا تستقبل منشورات | البوت ليس مديراً في القناة | إدارة القناة → المدراء → إضافة `@API_HUNTER_AIbot` (مع صلاحية النشر) |
 | `chat not found` عند الرد على المستخدم | المستخدم لم يبدأ البوت بعد | افتح `@API_HUNTER_AIbot` واضغط **Start** |
+| البوت يكرّر نفس الردود ولا يفهم الطلب | قاعدة البيانات غير مربوطة → يعمل على البيانات التجريبية الثابتة | نفّذ `npm run db:link -- "<رابط Supabase>" --deploy` (سيتوقف التنبيه: «قاعدة البيانات قيد الربط») |
+| رد واحد فقط لكل رسالة | مقصود — الردود المجمّعة الجديدة | إن وردت رسائل مكررة فعلاً تحقق من تعطيل Polling محلياً (`BOT_POLLING=false`) |
 | الموقع يعرض بيانات تجريبية فقط | `DATABASE_URL` غير مضبوط/غير صحيح | نفّذ الخطوة 1️⃣ ثم `vercel env add DATABASE_URL production` وأعد النشر |
 | فشل تحليل AI (`429`/`503`) | حصة Gemini المجانية (طلبات/دقيقة) | يعمل تلقائياً بالوضع القواعدي؛ خفّض `AGENT_CONCURRENCY` وارفع `AI_MAX_ATTEMPTS` |
 | `prisma client not generated` | لم يُنشأ العميل بعد التثبيت | `npm run db:generate` |
