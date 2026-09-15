@@ -198,7 +198,8 @@ export function rankServices(
 
   return scored
     .filter((x) => x.relevance > 0) // لا نتائج وهمية: لا بد من تطابق فعلي
-    .sort((a, b) => b.total - a.total)
+    .map((x) => ({ ...x, tiebreak: Math.random() })) // تنويع: لا تتكرر نفس الإجابة حرفياً
+    .sort((a, b) => b.total - a.total || a.tiebreak - b.tiebreak)
     .slice(0, 3)
     .map((x) => x.s);
 }

@@ -2,6 +2,7 @@
  * سكربت البذر: أدخل البيانات التجريبية في قاعدة البيانات.
  * التشغيل: npm run db:seed --workspace @apihunter/db
  */
+import "./env";
 import { prisma } from "./index";
 import { seedServices } from "./seed-data";
 

@@ -2,6 +2,7 @@ import type { Context, Telegraf } from "telegraf";
 import { fetchLatest, fetchServices, logUserQuery, isDatabaseReachableCached } from "./db";
 import { classifyQuery, rankServices } from "./nlu";
 import {
+  blockedNote,
   categoriesKeyboard,
   dataModeNote,
   formatCategoryList,
@@ -143,7 +144,13 @@ async function runSmartSearch(ctx: Context, rawQuery: string) {
     });
   }
 
-  const text = formatSearchResultsReply(nlu.query || q, list);
+  // إشارة إلى حجب الخدمات في بلد المستخدم -> نرفق بدائل تعمل عالمياً
+  const blockedSignal = /محجوب|محجوبه|محظور|لا تعمل|لايعمل|غير متاح|blocked|block/i.test(q);
+  const text = formatSearchResultsReply(
+    nlu.query || q,
+    list,
+    blockedSignal ? blockedNote() : ""
+  );
   const keyboard = searchKeyboard(list);
   if (keyboard) {
     return ctx.replyWithHTML(withNote(text), { reply_markup: keyboard });

@@ -244,6 +244,251 @@ export const seedServices: ServiceRecord[] = [
     "FREE_CREDIT",
     "https://serpapi.com"
   ),
+  // ---------- بدائل تعمل عالمياً (لا تعتمد على خدمات محجوبة في بعض البلدان) ----------
+  svc(
+    "DuckDuckGo Instant Answer API",
+    "duckduckgo-instant-answer",
+    "DuckDuckGo",
+    "SEARCH_TOOLS",
+    "بحث فوري وملخصات وإجابات بلا مفتاح إطلاقاً - يعمل عالمياً ولا يحتاج تسجيلاً أو بطاقة.",
+    {
+      rateLimit: "بدون مفتاح (استخدام عادل)",
+      models: ["instant-answer", "related-topics"],
+      freeCredits: "مجاني بالكامل وبدون API key",
+      requiresCard: false,
+      notes: "مثالي كبديل فوري عندما تكون خدمات البحث الأخرى محجوبة في بلدك.",
+    },
+    "https://duckduckgo.com/api",
+    "https://duckduckgo.com/api",
+    pymod(
+      'import requests\n' +
+      'r = requests.get("https://api.duckduckgo.com/", params={"q": "free api", "format": "json"})\n' +
+      'print(r.json().get("AbstractText"))'
+    ),
+    "FREE_TIER",
+    "https://duckduckgo.com"
+  ),
+  svc(
+    "Google Programmable Search (Custom Search JSON)",
+    "google-programmable-search",
+    "Google",
+    "SEARCH_TOOLS",
+    "محرك بحث مخصص من Google: أنشئ محركاً (cx) واستعلم بنتائج ويب وصور من مفتاحك الخاص.",
+    {
+      dailyRequests: 100,
+      rateLimit: "100 استعلام/يوم",
+      models: ["web", "images"],
+      freeCredits: "100 استعلام مجاناً يومياً",
+      requiresCard: false,
+      notes: "المفتاح من Google Cloud Console + معرّف محرك البحث (cx) من لوحة Programmable Search.",
+    },
+    "https://programmablesearchengine.google.com/controlpanel/create",
+    "https://developers.google.com/custom-search/v1/overview",
+    pymod(
+      'import requests\n' +
+      'r = requests.get("https://www.googleapis.com/customsearch/v1",\n' +
+      '                 params={"key": "YOUR_KEY", "cx": "YOUR_CX", "q": "free api"})\n' +
+      'print(r.json()["items"][0]["title"])'
+    ),
+    "FREE_TIER",
+    "https://developers.google.com/custom-search"
+  ),
+  svc(
+    "Zenserp Search API",
+    "zenserp-search",
+    "Zenserp",
+    "SEARCH_TOOLS",
+    "نتائج بحث ويب وصور وأخبار من Google بشكل JSON بسيط - حصة مجانية شهرية للمطورين.",
+    {
+      monthlyRequests: 50,
+      rateLimit: "50 بحث/شهر",
+      freeCredits: "50 بحث مجاناً شهرياً",
+      requiresCard: false,
+      notes: "يسجّل بالبريد فقط؛ مناسب للاختبارات الخفيفة.",
+    },
+    "https://app.zenserp.com/register",
+    "https://zenserp.com/documentation/",
+    pymod(
+      'import requests\n' +
+      'r = requests.get("https://app.zenserp.com/api/v2/search",\n' +
+      '                 params={"apikey": "YOUR_ZENSERP_KEY", "q": "free api"})\n' +
+      'print(r.json()["organic"][0]["title"])'
+    ),
+    "FREE_CREDIT",
+    "https://zenserp.com"
+  ),
+  svc(
+    "SearchApi.io",
+    "searchapi-io",
+    "SearchApi.io",
+    "SEARCH_TOOLS",
+    "واجهة تجمع نتائج Google و Bing و YouTube وغيرها بصيغة JSON موحّدة مع حصة مجانية شهرية.",
+    {
+      monthlyRequests: 100,
+      rateLimit: "100 بحث/شهر",
+      freeCredits: "100 بحث مجاناً شهرياً",
+      requiresCard: false,
+      notes: "الحصة قد تتغير؛ راجع لوحة الحساب قبل الاستخدام المكثّف.",
+    },
+    "https://www.searchapi.io/users/sign_up",
+    "https://www.searchapi.io/docs/google",
+    pymod(
+      'import requests\n' +
+      'r = requests.get("https://www.searchapi.io/api/v1/search",\n' +
+      '                 params={"api_key": "YOUR_KEY", "engine": "google", "q": "free api"})\n' +
+      'print(r.json()["organic_results"][0]["title"])'
+    ),
+    "FREE_CREDIT",
+    "https://www.searchapi.io"
+  ),
+  svc(
+    "Wikimedia REST API",
+    "wikimedia-rest",
+    "Wikimedia Foundation",
+    "SEARCH_TOOLS",
+    "بحث في ويكيبيديا والبيانات الوصفية والمحتوى الحر عبر REST - بدون مفتاح ولا بطاقة.",
+    {
+      rateLimit: "بدون مفتاح (استخدام عادل)",
+      models: ["wikipedia-search", "page-summary"],
+      freeCredits: "مجاني بالكامل وبدون مفتاح",
+      requiresCard: false,
+      notes: "أضف User-Agent واضحاً للاستخدام الكثيف حسب سياسة Wikimedia.",
+    },
+    "https://api.wikimedia.org/",
+    "https://www.mediawiki.org/wiki/API:REST_API",
+    pymod(
+      'import requests\n' +
+      'r = requests.get("https://api.wikimedia.org/core/v1/wikipedia/ar/search/page",\n' +
+      '                 params={"q": "واجهة برمجة", "limit": 5},\n' +
+      '                 headers={"User-Agent": "APIHunterAI/1.0"}).json()\n' +
+      'print([p["title"] for p in r.get("pages", [])])'
+    ),
+    "FREE_TIER",
+    "https://api.wikimedia.org/"
+  ),
+  svc(
+    "Openverse API",
+    "openverse-api",
+    "WordPress / Openverse",
+    "SEARCH_TOOLS",
+    "بحث في ملايين الصور والصوتيات الحرة (CC) بدون مفتاح - ممتاز لتغذية المشاريع بالوسائط.",
+    {
+      rateLimit: "بدون مفتاح (استخدام عادل)",
+      models: ["images", "audio"],
+      freeCredits: "مجاني بالكامل وبدون مفتاح",
+      requiresCard: false,
+      notes: "التسجيل اختياري ويرفع الحصة فقط.",
+    },
+    "https://api.openverse.org/v1/",
+    "https://api.openverse.org/v1/",
+    pymod(
+      'import requests\n' +
+      'r = requests.get("https://api.openverse.org/v1/images/", params={"q": "nature"}).json()\n' +
+      'print(r["results"][0]["url"])'
+    ),
+    "FREE_TIER",
+    "https://openverse.org"
+  ),
+  svc(
+    "Internet Archive APIs",
+    "internet-archive",
+    "Internet Archive",
+    "SEARCH_TOOLS",
+    "بحث في أرشيف الإنترنت والمواقع المؤرشفة (Wayback Machine) - بيانات ضخمة بلا مفتاح.",
+    {
+      rateLimit: "بدون مفتاح (استخدام عادل)",
+      models: ["advancedsearch", "wayback-availability"],
+      freeCredits: "مجاني بالكامل وبدون مفتاح",
+      requiresCard: false,
+      notes: "مناسب للتحقق من الروابط الميتة وإيجاد نسخ مؤرشفة.",
+    },
+    "https://archive.org/developers/",
+    "https://archive.org/developers/index-apis.html",
+    pymod(
+      'import requests\n' +
+      'r = requests.get("https://archive.org/advancedsearch.php",\n' +
+      '                 params={"q": "free api", "fl[]": "identifier", "rows": 5, "output": "json"})\n' +
+      'print(r.json()["response"]["docs"])'
+    ),
+    "FREE_TIER",
+    "https://archive.org"
+  ),
+  svc(
+    "OpenAlex API",
+    "openalex-api",
+    "OurResearch",
+    "SEARCH_TOOLS",
+    "بحث أكاديمي مفتوح (ملايين الأوراق والمؤلفين والمؤسسات) بدون مفتاح - مثالي للوكلاء البحثية.",
+    {
+      rateLimit: "بدون مفتاح (Polite pool بالبريد)",
+      models: ["works", "authors", "institutions"],
+      freeCredits: "مجاني بالكامل وبدون مفتاح",
+      requiresCard: false,
+      notes: "أضف بريدك في param mailto للحصول على أولوية الاستجابة.",
+    },
+    "https://openalex.org/",
+    "https://docs.openalex.org/",
+    pymod(
+      'import requests\n' +
+      'r = requests.get("https://api.openalex.org/works",\n' +
+      '                 params={"search": "api", "per-page": 5, "mailto": "you@example.com"}).json()\n' +
+      'print([w["title"] for w in r["results"]])'
+    ),
+    "FREE_TIER",
+    "https://openalex.org"
+  ),
+  svc(
+    "Algolia Search",
+    "algolia-search",
+    "Algolia",
+    "SEARCH_TOOLS",
+    "بحث كن-خدمة (Search-as-a-Service): فهرسة بياناتك وتقديم بحث فوري فائق السرعة من موقعك أو تطبيقك.",
+    {
+      monthlyRequests: 10000,
+      rateLimit: "10,000 طلب/شهر",
+      models: ["search", "recommend", "filters"],
+      freeCredits: "طبقة مجانية دائمة (10k طلبات/شهر)",
+      requiresCard: false,
+      notes: "تحتاج إنشاء تطبيق ثم استخدام App ID + Search-Only API Key.",
+    },
+    "https://dashboard.algolia.com/users/sign_up",
+    "https://www.algolia.com/doc/rest-api/search/",
+    pymod(
+      'import requests\n' +
+      'url = "https://YOUR_APP_ID-dsn.algolia.net/1/indexes/YOUR_INDEX/query"\n' +
+      'r = requests.post(url, json={"query": "api"},\n' +
+      '                  headers={"X-Algolia-Application-Id": "YOUR_APP_ID",\n' +
+      '                           "X-Algolia-API-Key": "YOUR_SEARCH_KEY"})\n' +
+      'print(r.json()["hits"][:3])'
+    ),
+    "FREE_TIER",
+    "https://www.algolia.com"
+  ),
+  svc(
+    "Firecrawl Search & Scrape",
+    "firecrawl-search",
+    "Firecrawl",
+    "SEARCH_TOOLS",
+    "بحث وزحف وتحويل صفحات الويب إلى Markdown جاهز للـ LLM - رصيد مجاني للمطورين.",
+    {
+      rateLimit: "رصيد مجاني محدود",
+      models: ["search", "scrape", "crawl"],
+      freeCredits: "رصيد مجاني عند التسجيل (500 نقطة تقريباً)",
+      requiresCard: false,
+      notes: "أفضل مؤشر عند حجب واجهات البحث التقليدية: يعمل من خوادم Firecrawl.",
+    },
+    "https://www.firecrawl.dev/signin",
+    "https://docs.firecrawl.dev/",
+    pymod(
+      'import requests\n' +
+      'r = requests.post("https://api.firecrawl.dev/v1/search",\n' +
+      '                  json={"query": "free api search", "limit": 3},\n' +
+      '                  headers={"Authorization": "Bearer YOUR_FIRECRAWL_KEY"})\n' +
+      'print(r.json()["data"])'
+    ),
+    "FREE_CREDIT",
+    "https://www.firecrawl.dev"
+  ),
   // ===================================================================
   // 3) الصوت والصورة والنصوص
   // ===================================================================

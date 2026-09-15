@@ -25,7 +25,8 @@
     "db:seed": "tsx src/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0"
+    "@prisma/client": "^5.22.0",
+    "dotenv": "^16.6.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

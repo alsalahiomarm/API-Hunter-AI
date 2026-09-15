@@ -149,8 +149,23 @@ function freeTierLine(s: ServiceRecord): string {
   return bits.length ? bits.join(" · ") : "خطة مجانية";
 }
 
+/** تلميح لمن يواجه حجب بعض خدمات البحث في بلده */
+export function blockedNote(): string {
+  return [
+    "💡 <i>بعض خدمات البحث محجوبة في بعض البلدان — هذه بدائل تعمل من خوادمها:</i>",
+    "   • <b>DuckDuckGo Instant Answer</b> — بدون مفتاح إطلاقاً",
+    "   • <b>Google Programmable Search</b> — 100 استعلام/يوم",
+    "   • <b>Firecrawl Search</b> — بحث وزحف من خوادمهم",
+    "   • <b>Wikimedia · Openverse · Internet Archive</b> — بيانات ووسائط بدون مفتاح",
+  ].join("\n");
+}
+
 /** رسالة واحدة مجمّعة لنتائج البحث */
-export function formatSearchResultsReply(query: string, services: ServiceRecord[]): string {
+export function formatSearchResultsReply(
+  query: string,
+  services: ServiceRecord[],
+  note = ""
+): string {
   const head = query
     ? `🔎 <b>نتائج البحث عن:</b> ${esc(query)}`
     : `🔎 <b>أحدث ما اصطاده الصيّاد:</b>`;
@@ -165,7 +180,9 @@ export function formatSearchResultsReply(query: string, services: ServiceRecord[
     if (s.documentationLink) parts.push(`    ${esc(s.documentationLink)}`);
     return parts.join("\n");
   });
-  return [head, "", ...body, "", "👇 اضغط زراً للانتقال مباشرة، أو اكتب طلباً آخر بصيغة مختلفة."].join("\n");
+  return [head, "", ...body, "", note, "👇 اضغط زراً للانتقال مباشرة، أو اكتب طلباً آخر بصيغة مختلفة."]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** أزرار النتائج: زر لكل خدمة ينقل لصفحة التفعيل */
