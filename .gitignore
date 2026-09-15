@@ -20,6 +20,7 @@ packages/db/generated/
 # ملفات وقت التشغيل المحلية
 posted.json
 user-logs.json
+captured.json
 
 # Vercel
 .vercel/
@@ -41,3 +42,5 @@ playwright-report/
 .idea/
 .DS_Store
 Thumbs.db
+.vercel
+.env*
