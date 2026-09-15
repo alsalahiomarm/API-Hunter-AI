@@ -1,22 +1,17 @@
 import type { Context, Telegraf } from "telegraf";
-import { fetchLatest, fetchServices, logUserQuery } from "./db";
+import { fetchLatest, fetchServices, logUserQuery, isDatabaseReachableCached } from "./db";
 import { classifyQuery, rankServices } from "./nlu";
 import {
   categoriesKeyboard,
+  dataModeNote,
   formatCategoryList,
+  formatGreeting,
   formatLatestList,
-  formatServiceCompact,
+  formatNoResults,
+  formatSearchResultsReply,
   formatServiceFull,
-  privateKeyboard,
+  searchKeyboard,
 } from "./formatter";
-
-const CATEGORY_SHORT: Record<string, string> = {
-  AI_MODELS: "نماذج ذكاء",
-  SEARCH_TOOLS: "أدوات بحث",
-  AUDIO_IMAGE: "صوت وصورة",
-  DATABASES: "قواعد بيانات",
-  DEV_TOOLS: "أدوات تطوير",
-};
 
 const HELP_MSG = [
   "<b>🪤 صيّاد المفاتيح - الأوامر المتاحة:</b>",
@@ -101,7 +96,7 @@ export function registerCommands(bot: Telegraf) {
   });
 }
 
-/** بحث ذكي مشترك بين /search والرسائل الحرة */
+/** بحث ذكي مشترك بين /search والرسائل الحرة - يرد برسالة واحدة مجمّعة */
 async function runSmartSearch(ctx: Context, rawQuery: string) {
   const q = rawQuery.trim();
   if (!q) {
@@ -111,39 +106,49 @@ async function runSmartSearch(ctx: Context, rawQuery: string) {
   }
 
   const nlu = classifyQuery(q);
+  const live = await isDatabaseReachableCached();
+  const withNote = (text: string) => (live ? text : `${text}\n\n${dataModeNote(live)}`);
+
+  // 1) تحية فقط -> ترحيب بلوحة التصنيفات (بدل عرض خدمات عشوائية)
+  if (nlu.intent === "greeting") {
+    return ctx.replyWithHTML(formatGreeting(ctx.from?.first_name), {
+      reply_markup: categoriesKeyboard(),
+    });
+  }
+
+  // 2) بحث فعلي
   const services = await fetchServices({ category: nlu.category });
   const ranked = rankServices(services, nlu);
 
-  // تسجيل الاستعلام في قاعدة البيانات
+  // لا نتائج دقيقة؟ نعرض الأحدث (أو نتائج التصنيف) بدل الرد الفارغ
+  const list = ranked.length
+    ? ranked
+    : nlu.category || !nlu.query
+      ? services.slice(0, 3)
+      : [];
+
+  // تسجيل الاستعلام (لا يُفشل الرد إن فشل)
   await logUserQuery({
     telegramId: String(ctx.from?.id ?? "?"),
     firstName: ctx.from?.first_name ?? null,
     username: ctx.from?.username ?? null,
     query: q,
     intent: nlu.intent + (nlu.category ? `:${nlu.category}` : ""),
-    matched: ranked.map((s) => s.name),
+    matched: list.map((s) => s.name),
   }).catch(() => {});
 
-  if (ranked.length === 0) {
-    return ctx.reply(
-      `😔 لم أجد نتائج لـ «${q}». جرّب صياغة أخرى أو اضغط /categories لتصفح التصنيفات.`
-    );
-  }
-
-  const header = nlu.category
-    ? `أفضل النتائج لطلبك (${
-        CATEGORY_SHORT[nlu.category] ?? "أخرى"
-      }) 🔖:`
-    : `أفضل النتائج لطلبك 🔖:`;
-
-  for (const svc of ranked) {
-    await ctx.replyWithHTML(formatServiceCompact(svc), {
-      reply_markup: privateKeyboard(svc),
+  if (list.length === 0) {
+    return ctx.replyWithHTML(withNote(formatNoResults(q, services.slice(0, 2))), {
+      reply_markup: categoriesKeyboard(),
     });
   }
-  await ctx.reply(
-    `💡 خدمة توصلت؟ للرد السريع اكتب بأي صيغة جديدة، أو استخدم /latest و /help.`
-  );
+
+  const text = formatSearchResultsReply(nlu.query || q, list);
+  const keyboard = searchKeyboard(list);
+  if (keyboard) {
+    return ctx.replyWithHTML(withNote(text), { reply_markup: keyboard });
+  }
+  return ctx.replyWithHTML(withNote(text));
 }
 
 export { HELP_MSG, formatServiceFull };

@@ -57,6 +57,16 @@ export async function isDatabaseReachable(): Promise<boolean> {
   }
 }
 
+// نسخة مُخزَّنة مؤقتاً لتجنب إبطاء كل رسالة بفحص قاعدة البيانات
+let probe: { at: number; ok: boolean } | null = null;
+
+export async function isDatabaseReachableCached(ttlMs = 60000): Promise<boolean> {
+  if (probe && Date.now() - probe.at < ttlMs) return probe.ok;
+  const ok = await isDatabaseReachable();
+  probe = { at: Date.now(), ok };
+  return ok;
+}
+
 // ---------------- جلب الخدمات ----------------
 export async function fetchServices(filter?: {
   category?: Category | "";

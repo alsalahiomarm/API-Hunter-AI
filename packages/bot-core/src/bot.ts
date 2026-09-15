@@ -20,6 +20,24 @@ export function createBot(token?: string): Telegraf {
 
   const bot = new Telegraf(t);
 
+  // منع معالجة نفس التحديث مرتين (تليجرام قد يعيد الإرسال بعد إعادة النشر أو convergence)
+  const seen = new Map<number, number>();
+  bot.use(async (ctx, next) => {
+    const id = ctx.update.update_id;
+    const now = Date.now();
+    if (seen.has(id)) {
+      console.warn(`[bot] تحديث مكرر تم تجاهله: ${id}`);
+      return;
+    }
+    seen.set(id, now);
+    if (seen.size > 500) {
+      for (const [k, t] of seen) {
+        if (now - t > 10 * 60 * 1000) seen.delete(k);
+      }
+    }
+    await next();
+  });
+
   // الأوامر والرسائل الحرة
   registerCommands(bot);
 

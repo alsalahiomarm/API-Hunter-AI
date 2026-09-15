@@ -52,7 +52,7 @@ export function formatServiceCompact(s: ServiceRecord): string {
     `🏷️ <b>${esc(s.name)}</b>\n` +
     `   ${CATEGORY_LABEL[s.category] ?? s.category} · ${STATUS_LABEL[s.status] ?? s.status}\n` +
     `   ${esc(s.description.slice(0, 120))}\n` +
-    `   🔗 ${s.activationLink}`
+    `   🔗 ${esc(s.activationLink)}`
   );
 }
 
@@ -67,7 +67,7 @@ export function formatServiceFull(s: ServiceRecord, footer = ""): string {
     `🎯 <b>الخطة المجانية:</b>`,
     freeTierText(s),
     ``,
-    `📖 <b>التوثيق:</b> ${s.documentationLink}`,
+    `📖 <b>التوثيق:</b> ${esc(s.documentationLink)}`,
     ``,
     s.sourceUrl ? `🩻 المصدر: ${esc(s.sourceUrl)}` : "",
     footer,
@@ -125,4 +125,79 @@ export function formatCategoryList(category: string, services: ServiceRecord[]):
   const label = CATEGORY_LABEL[category] ?? category;
   if (!services.length) return `لا نتائج في ${label} حالياً.`;
   return [`📂 <b>${label}</b>` + " - أفضل النتائج:", "", ...services.map(formatServiceCompact)].join("\n\n");
+}
+
+// ----------------------------------------------------------
+// تنسيقات الردود المجمّعة (رسالة واحدة لكل طلب = تجربة أفضل وأقل إزعاجاً)
+// ----------------------------------------------------------
+
+/** تنبيه يوضّح مصدر البيانات عندما تكون قاعدة البيانات غير مربوطة بعد */
+export function dataModeNote(live: boolean): string {
+  return live
+    ? ""
+    : "⚠️ <i>قاعدة البيانات قيد الربط حالياً — هذه نتائج من البيانات التجريبية.</i>";
+}
+
+/** ملخص الخطة المجانية في سطر واحد */
+function freeTierLine(s: ServiceRecord): string {
+  const f = s.freeTier;
+  const bits: string[] = [];
+  if (f.freeCredits) bits.push(esc(f.freeCredits));
+  if (f.monthlyRequests) bits.push(`~${f.monthlyRequests.toLocaleString("en")} طلب/شهر`);
+  if (f.dailyRequests) bits.push(`${f.dailyRequests.toLocaleString("en")} طلب/يوم`);
+  if (f.models?.length) bits.push(esc(f.models.slice(0, 2).join(", ")));
+  return bits.length ? bits.join(" · ") : "خطة مجانية";
+}
+
+/** رسالة واحدة مجمّعة لنتائج البحث */
+export function formatSearchResultsReply(query: string, services: ServiceRecord[]): string {
+  const head = query
+    ? `🔎 <b>نتائج البحث عن:</b> ${esc(query)}`
+    : `🔎 <b>أحدث ما اصطاده الصيّاد:</b>`;
+  const body = services.map((s, i) => {
+    const parts = [
+      `${i + 1}. <b>${esc(s.name)}</b>`,
+      `   ${CATEGORY_LABEL[s.category] ?? s.category} · ${STATUS_LABEL[s.status] ?? s.status}`,
+      `   💎 ${freeTierLine(s)}`,
+      `   📝 ${esc(s.description.slice(0, 110))}`,
+      `   🔗 ${esc(s.activationLink)}`,
+    ];
+    if (s.documentationLink) parts.push(`    ${esc(s.documentationLink)}`);
+    return parts.join("\n");
+  });
+  return [head, "", ...body, "", "👇 اضغط زراً للانتقال مباشرة، أو اكتب طلباً آخر بصيغة مختلفة."].join("\n");
+}
+
+/** أزرار النتائج: زر لكل خدمة ينقل لصفحة التفعيل */
+export function searchKeyboard(services: ServiceRecord[]) {
+  const rows = services.slice(0, 3).map((s) => [
+    Markup.button.url(`🚀 ${s.name.slice(0, 26)}`, s.activationLink),
+  ]);
+  return rows.length ? Markup.inlineKeyboard(rows).reply_markup : undefined;
+}
+
+/** رسالة عدم وجود نتائج + اقتراحات بديلة */
+export function formatNoResults(query: string, suggestions: ServiceRecord[]): string {
+  const lines = [
+    `😔 لم أجد نتائج مطابقة لـ «${esc(query)}».`,
+    "",
+    " جرّب صياغة أخرى، مثال: «مفتاح بحث في الإنترنت» أو «نموذج ذكاء اصطناعي» أو «قاعدة بيانات».",
+  ];
+  if (suggestions.length) {
+    lines.push("", " وقد تفيدك هذه الخدمات:", ...suggestions.map(formatServiceCompact));
+  }
+  return lines.join("\n");
+}
+
+/** لوحة التصنيفات مع دعوة واضحة */
+export function formatGreeting(firstName?: string): string {
+  return [
+    firstName ? `👋 أهلاً <b>${esc(firstName)}</b>!` : " أهلاً بك!",
+    "",
+    "أنا <b>صيّاد مفاتيح الـ API المجانية</b> 🪤",
+    "اكتب لي ما تحتاجه بالعربية أو الإنجليزية مثل:",
+    "   «مفتاح بحث في الإنترنت» · «نموذج ذكاء اصطناعي» · «توليد صور» · «قاعدة بيانات»",
+    "",
+    "أو اختر تصنيفاً من الأزرار 👇",
+  ].join("\n");
 }
