@@ -28,6 +28,10 @@ captured.json
 # Logs
 *.log
 *.done
+
+# ملفات مؤقتة (رسائل الالتزام)
+commit-msg.txt
+cm.txt
 npm-debug.log*
 logs/
 *.tsbuildinfo
