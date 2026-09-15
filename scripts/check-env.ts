@@ -40,7 +40,73 @@ for (const [key, hint] of Object.entries(KEY_HINTS)) {
 if (missing) {
   console.log(`\n⚠️ يوجد ${missing} متغير ناقص. أكمل ملف .env ثم أعد التشغيل.`);
   console.log("   انسخ القالب:  copy .env.example .env");
-  process.exit(1);
 }
 
-console.log("\n✔ جميع المتغيرات الأساسية موجودة. يمكنك مواصلة التجهيز.");
+// ----------------------------------------------------------
+// فحوصات اتصال حقيقية (قاعدة البيانات + مزود الذكاء الاصطناعي)
+// ----------------------------------------------------------
+async function checkDatabase() {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) return;
+  if (/@(localhost|127\.0\.0\.1)/i.test(url)) {
+    console.log(
+      "   ℹ️ DATABASE_URL يشير إلى localhost — شغّل قاعدة محلية (docker compose up -d) أو ضع رابط Supabase."
+    );
+  }
+  try {
+    const db = await import("@apihunter/db");
+    await db.prisma.$queryRaw`SELECT 1`;
+    console.log("   ✅ الاتصال بقاعدة البيانات ناجح (PostgreSQL).");
+    try {
+      const total = await db.prisma.apiService.count();
+      console.log(`   📦 عدد الخدمات المخزنة حالياً: ${total}`);
+      if (total === 0) console.log("   ℹ️ الجداول فارغة — نفّذ:  npm run draw:seed");
+    } catch {
+      console.log("   ⚠️ الجداول غير موجودة بعد — نفّذ:  npm run draw:seed");
+    }
+  } catch (err) {
+    const msg = (err as Error).message.split("\n").filter(Boolean).slice(-1)[0] ?? "";
+    console.log(`   ❌ تعذّر الاتصال بقاعدة البيانات: ${msg}`);
+  }
+}
+
+async function checkAiProvider() {
+  const gemini = process.env.GEMINI_API_KEY?.trim();
+  const openai = process.env.OPENAI_API_KEY?.trim();
+  if (!gemini && !openai) return;
+
+  if (gemini) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(gemini)}`
+      );
+      if (res.ok) {
+        const data = (await res.json()) as { models?: unknown[] };
+        console.log(
+          `   ✅ مفتاح Gemini صالح (${data.models?.length ?? 0} نموذج متاح) — وضع التحليل: AI`
+        );
+      } else {
+        console.log(`   ❌ مفتاح Gemini مرفوض (HTTP ${res.status}) — راجع GEMINI_API_KEY.`);
+      }
+    } catch (err) {
+      console.log(`   ⚠️ تعذّر التحقق من مفتاح Gemini: ${(err as Error).message}`);
+    }
+    return;
+  }
+
+  console.log("   ℹ️ OPENAI_API_KEY مُعيَّن — سيُستخدم مزود OpenAI المتوافق للتحليل الذكي.");
+}
+
+async function main() {
+  await checkDatabase();
+  await checkAiProvider();
+
+  if (missing) process.exit(1);
+
+  console.log("\n✔ جميع المتغيرات الأساسية موجودة. يمكنك مواصلة التجهيز.");
+}
+
+main().catch((err) => {
+  console.error("❌ فشل الفحص:", err);
+  process.exit(1);
+});
