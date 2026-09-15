@@ -12,7 +12,13 @@
  * الاستخدام:
  *   npm run db:link -- "postgresql://postgres.xxxx:PASSWORD@host:6543/postgres?pgbouncer=true&connection_limit=1"
  *   npm run db:link -- --url="postgresql://..." --deploy
+ *   npm run db:link -- --url="<transaction pooler 6543>" --migrate-url="<session pooler 5432>"
+ *   npm run db:link -- --from-json=tmp-db-urls.json --deploy
  *   npm run db:link -- --url="postgresql://..." --skip-vercel --skip-gh
+ *
+ * ملاحظات لـ Supabase:
+ *   - `--url` يُوضع في Vercel/GitHub (Transaction Pooler 6543 + pgbouncer=true&connection_limit=1).
+ *   - `--migrate-url` يُوضع في .env ويُستخدم في db push/seed (Session Pooler 5432 يدعم DDL).
  */
 import { config as loadEnv } from "dotenv";
 import { resolve } from "path";
@@ -138,17 +144,41 @@ function pushSchemaAndSeed(url: string) {
   log("✅", "المخطط مدفوع والبيانات مزروعة.");
 }
 
-async function main() {
+/** يقرأ الروابط من ملف JSON (--from-json) أو من الوسائط المباشرة */
+function resolveUrls(): { url: string; migrateUrl: string } {
+  const fromJson = flagValue("from-json")?.trim();
+  if (fromJson) {
+    const p = resolve(process.cwd(), fromJson);
+    if (!existsSync(p)) {
+      console.error(`❌ لا يوجد ملف: ${fromJson}`);
+      process.exit(1);
+    }
+    const data = JSON.parse(readFileSync(p, "utf8")) as Record<string, string>;
+    const url = (data.runtime ?? data.url ?? data.DATABASE_URL ?? "").trim();
+    const migrateUrl = (data.migrate ?? data.migrateUrl ?? url).trim();
+    if (!url) {
+      console.error("❌ الملف لا يحتوي المفاتيح runtime أو url.");
+      process.exit(1);
+    }
+    return { url, migrateUrl };
+  }
   const url = resolveUrl();
-  const masked = url.replace(/:\/\/([^:]+):[^@]+@/, "://$1:****@");
-  log("🔗", `الرابط المستخدم: ${masked}`);
+  return { url, migrateUrl: flagValue("migrate-url")?.trim() || url };
+}
+
+async function main() {
+  const { url, migrateUrl } = resolveUrls();
+  const mask = (u: string) => u.replace(/:\/\/([^:]+):[^@]+@/, "://$1:****@");
+  log("🔗", `رابط التشغيل (Vercel/GitHub): ${mask(url)}`);
+  if (migrateUrl !== url) log("🔗", `رابط المخطط (.env + db push): ${mask(migrateUrl)}`);
 
   await testConnection(url);
-  writeLocalEnv(url);
+  if (migrateUrl !== url) await testConnection(migrateUrl);
+  writeLocalEnv(migrateUrl);
 
   if (!skipVercel) updateVercel(url);
   if (!skipGh) updateGitHub(url);
-  if (!skipSeed) pushSchemaAndSeed(url);
+  if (!skipSeed) pushSchemaAndSeed(migrateUrl);
 
   if (doDeploy) {
     log("🚀", "إعادة النشر إلى Vercel (production)…");

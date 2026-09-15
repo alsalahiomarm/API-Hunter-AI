@@ -13,11 +13,23 @@
 | جولة الاصطياد | `.github/workflows/hunt.yml` — كل 6 ساعات ✅ نشط |
 | ربط الويب هوك آلياً | `.github/workflows/webhook.yml` + `npm run webhook:set` ✅ |
 | أسرار GitHub | `TELEGRAM_BOT_TOKEN`, `BOT_WEBHOOK_SECRET`, `CRON_SECRET`, `GEMINI_API_KEY` ✅ |
-| **المتبقي** | إضافة **`DATABASE_URL`** من Supabase (3 مواضع: `.env` + Vercel + GitHub) |
+| قاعدة البيانات | **Supabase** — مشروع `API-HUNTER-AI` (ref `azhpxctczaledmttmvzm` · `ap-northeast-1`) ✅ **مربوطة** في `.env` + Vercel + GitHub |
+| بيانات البوت | `databaseReachable: true` — بيانات حقيقية من القاعدة (تتجدّد بجولات الاصطياد، لا بيانات تجريبية) |
+| المتبقي (يدوي) | إضافة البوت مديراً في القناة `@APIHUNTERAI` + الضغط على `/start` في `@API_HUNTER_AIbot` |
 
 ---
 
-## 1️⃣ ربط Supabase (الخطوة الوحيدة المتبقية)
+## 1️⃣ ربط Supabase —— ✅ منجز (التفاصيل للرجوع)
+
+> **حالة الربط الفعلية:** المشروع `API-HUNTER-AI` · ref `azhpxctczaledmttmvzm` · region `ap-northeast-1` ·
+> Pooler `aws-0-ap-northeast-1.pooler.supabase.com` · المستخدم `postgres.azhpxctczaledmttmvzm`.
+>
+> - `DATABASE_URL` في **Vercel + GitHub** (تشغيل سحابي): Transaction Pooler منفذ **6543** مع `?pgbouncer=true&connection_limit=1&schema=public`
+> - `DATABASE_URL` في **`.env`** (لـ `db push` / `seed` محلياً): Session Pooler منفذ **5432** مع `?schema=public`
+> - كلمة المرور محفوظة في `.env` (مستثنى من git) وفي أسرار Vercel/GitHub. لإعادة تعيينها: Supabase → Settings → Database → Reset password ثم `npm run db:link`.
+> - تحقّق سريع: `npm run env:check` يجب أن يُظهر «✅ الاتصال بقاعدة البيانات ناجح» وعدد الخدمات.
+
+خطوات الربط (للرجوع عند تغيير المشروع أو إعادة الربط):
 
 1. افتح مشروعك في [supabase.com](https://supabase.com) (ref: `azhpxctczaledmttmvzm`).
 2. **Project Settings → Database → Connection string → URI** وانسخ الرابط مع كلمة المرور.

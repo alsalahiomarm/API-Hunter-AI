@@ -53,8 +53,8 @@ docker compose up -d postgres
 
 **الخيار B - Supabase السحابي:**
 1. أنشئ مشروعاً مجانياً من [supabase.com](https://supabase.com).
-2. من `Project Settings → Database → Connection string` انسخ الرابط.
-3. ضع `?schema=public` في نهاية الرابط.
+2. من `Project Settings → Database → Connection string` انسخ رابط **Pooler** (Session 5432 للـ `db push`/الزرع، وTransaction 6543 للتشغيل على Vercel/GitHub).
+3. أسهل طريقة للربط: `npm run db:link -- "postgresql://..."` → يتولّى `.env` + Vercel + GitHub + `draw:seed` بأمر واحد.
 
 ثم انسخ ملف البيئة واملأه:
 ```bash

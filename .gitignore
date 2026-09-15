@@ -32,6 +32,7 @@ captured.json
 # ملفات مؤقتة (رسائل الالتزام)
 commit-msg.txt
 cm.txt
+tmp-db-urls.json
 npm-debug.log*
 logs/
 *.tsbuildinfo
