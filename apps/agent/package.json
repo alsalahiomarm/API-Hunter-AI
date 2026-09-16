@@ -11,6 +11,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@apihunter/bot-core": "*",
     "@apihunter/db": "*",
     "dotenv": "^16.4.5",
     "openai": "^4.76.0",

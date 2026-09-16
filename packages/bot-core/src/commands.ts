@@ -1,18 +1,22 @@
 import type { Context, Telegraf } from "telegraf";
-import { fetchLatest, fetchServices, logUserQuery, isDatabaseReachableCached } from "./db";
+import type { ServiceRecord } from "@apihunter/db";
+import { clearChatHistory, fetchLatest, fetchServices, logUserQuery, isDatabaseReachableCached, saveChatMessage } from "./db";
 import { classifyQuery, rankServices } from "./nlu";
 import {
   blockedNote,
   categoriesKeyboard,
   dataModeNote,
+  esc,
   formatCategoryList,
   formatGreeting,
   formatLatestList,
   formatNoResults,
   formatSearchResultsReply,
   formatServiceFull,
+  formatServicesBody,
   searchKeyboard,
 } from "./formatter";
+import { generateConversationalLead } from "./chat";
 
 const HELP_MSG = [
   "<b>🪤 صيّاد المفاتيح - الأوامر المتاحة:</b>",
@@ -43,6 +47,12 @@ export function registerCommands(bot: Telegraf) {
   });
 
   bot.help(async (ctx) => ctx.replyWithHTML(HELP_MSG));
+
+  // مسح ذاكرة المحادثة لهذا المستخدم
+  bot.command("reset", async (ctx) => {
+    clearChatHistory(String(ctx.from?.id ?? "")).catch(() => {});
+    await ctx.reply("🧹 مسحت ذاكرة المحادثة الحالية. من أين نبدأ؟ 👋");
+  });
 
   bot.command("latest", async (ctx) => {
     const latest = await fetchLatest(3);
@@ -97,7 +107,23 @@ export function registerCommands(bot: Telegraf) {
   });
 }
 
-/** بحث ذكي مشترك بين /search والرسائل الحرة - يرد برسالة واحدة مجمّعة */
+/** بناء الرد الحواري: تمهيدة من النموذج + قائمة الخدمات الحقيقية */ 
+function buildConversationalBlock(
+  leadText: string,
+  list: ServiceRecord[],
+  blockedSignal: boolean,
+  live: boolean
+): string {
+  const note = blockedSignal ? blockedNote() : "";
+  const parts = [esc(leadText)];
+  if (list.length) parts.push("", formatServicesBody(list));
+  if (note) parts.push("", note);
+  parts.push("", "👇 اضغط زراً للانتقال مباشرة، أو اكتب طلباً آخر بصيغة مختلفة.");
+  const text = parts.filter(Boolean).join("\n");
+  return live ? text : `${text}\n\n${dataModeNote(live)}`;
+}
+
+/** بحث ذكي مشترك بين /search والرسائل الحرة - يرد برسالة حوارية واحدة مجمّعة */ 
 async function runSmartSearch(ctx: Context, rawQuery: string) {
   const q = rawQuery.trim();
   if (!q) {
@@ -106,15 +132,18 @@ async function runSmartSearch(ctx: Context, rawQuery: string) {
     );
   }
 
-  const nlu = classifyQuery(q);
+  const telegramId = String(ctx.from?.id ?? "?");
   const live = await isDatabaseReachableCached();
   const withNote = (text: string) => (live ? text : `${text}\n\n${dataModeNote(live)}`);
+  const nlu = classifyQuery(q);
 
-  // 1) تحية فقط -> ترحيب بلوحة التصنيفات (بدل عرض خدمات عشوائية)
+  // 1) تحية فقط -> ترحيب بلوحة التصنيفات (بدل عرض خدمات عشوائية) مع حفظ الذاكرة
   if (nlu.intent === "greeting") {
-    return ctx.replyWithHTML(formatGreeting(ctx.from?.first_name), {
-      reply_markup: categoriesKeyboard(),
-    });
+    await saveChatMessage(telegramId, "user", q);
+    const greeting = formatGreeting(ctx.from?.first_name);
+    await ctx.replyWithHTML(greeting, { reply_markup: categoriesKeyboard() });
+    await saveChatMessage(telegramId, "assistant", greeting.replace(/<[^>]+>/g, ""));
+    return;
   }
 
   // 2) بحث فعلي
@@ -128,34 +157,64 @@ async function runSmartSearch(ctx: Context, rawQuery: string) {
       ? services.slice(0, 3)
       : [];
 
-  // تسجيل الاستعلام (لا يُفشل الرد إن فشل)
+  // إشارة إلى حجب الخدمات في بلد المستخدم -> نرفق بدائل تعمل عالمياً
+  const blockedSignal = /محجوب|محجوبه|محظور|لا تعمل|لايعمل|غير متاح|blocked|block/i.test(q);
+
+  // 3) الرد الحواري الذكي (مع سجل المحادثة المحفوظ)
+  const lead = await generateConversationalLead({
+    telegramId,
+    query: q,
+    firstName: ctx.from?.first_name,
+    services: list,
+    suggestions: list.length ? [] : services.slice(0, 2),
+    blockedSignal,
+    live,
+  });
+
+  // 4) تسجيل الاستعلام + الذاكرة (لا يُفشل الرد إن فشلا)
   await logUserQuery({
-    telegramId: String(ctx.from?.id ?? "?"),
+    telegramId,
     firstName: ctx.from?.first_name ?? null,
     username: ctx.from?.username ?? null,
     query: q,
     intent: nlu.intent + (nlu.category ? `:${nlu.category}` : ""),
     matched: list.map((s) => s.name),
   }).catch(() => {});
-
-  if (list.length === 0) {
-    return ctx.replyWithHTML(withNote(formatNoResults(q, services.slice(0, 2))), {
-      reply_markup: categoriesKeyboard(),
-    });
+  await saveChatMessage(telegramId, "user", q).catch(() => {});
+  const leadText = lead?.lead ?? "";
+  if (leadText) {
+    await saveChatMessage(telegramId, "assistant", stripHtml(leadText)).catch(() => {});
   }
 
-  // إشارة إلى حجب الخدمات في بلد المستخدم -> نرفق بدائل تعمل عالمياً
-  const blockedSignal = /محجوب|محجوبه|محظور|لا تعمل|لايعمل|غير متاح|blocked|block/i.test(q);
-  const text = formatSearchResultsReply(
-    nlu.query || q,
-    list,
-    blockedSignal ? blockedNote() : ""
-  );
+  // 5) إرسال الرد
   const keyboard = searchKeyboard(list);
-  if (keyboard) {
-    return ctx.replyWithHTML(withNote(text), { reply_markup: keyboard });
+  if (list.length) {
+    const text = leadText
+      ? buildConversationalBlock(leadText, list, blockedSignal, live)
+      : withNote(formatSearchResultsReply(nlu.query || q, list, blockedSignal ? blockedNote() : ""));
+    return keyboard
+      ? ctx.replyWithHTML(text, { reply_markup: keyboard })
+      : ctx.replyWithHTML(text);
   }
-  return ctx.replyWithHTML(withNote(text));
+
+  // لا نتائج إطلاقاً
+  if (leadText) {
+    const text = buildConversationalBlock(leadText, [], blockedSignal, live);
+    return ctx.replyWithHTML(text, { reply_markup: categoriesKeyboard() });
+  }
+  return ctx.replyWithHTML(withNote(formatNoResults(q, services.slice(0, 2))), {
+    reply_markup: categoriesKeyboard(),
+  });
+}
+
+/** إزالة وسوم HTML من رد النموذج قبل حفظه في الذاكرة */
+function stripHtml(s: string): string {
+  return s
+    .replace(/<[^>]+>/g, "")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/^[-•\s]+/gm, "")
+    .replace(/\s+\n/g, "\n")
+    .trim();
 }
 
 export { HELP_MSG, formatServiceFull };

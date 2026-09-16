@@ -1,10 +1,11 @@
 import type { Category, FreeTierDetails } from "@apihunter/db";
 import type { HuntResult, RawEntry } from "./types";
 import { stripMarkdownLinks } from "./crawler";
+import { callLlm, hasAnyAiKey } from "@apihunter/bot-core/ai";
 
 /**
  * وحدة التحليل الذكي:
- * 1) وضع AI: استدعاء نموذج OpenAI/Gemini عبر SDK متوافق.
+ * 1) وضع AI: استدعاء النموذج عبر الطبقة متعددة المزوّدات (Gemini/OpenRouter/Groq/DeepSeek...).
  * 2) وضع Heuristic: استخراج قواعدي (regex) عند غياب المفاتيح.
  */
 
@@ -14,7 +15,7 @@ import { stripMarkdownLinks } from "./crawler";
  * سيعطي نتيجة خاطئة (false) دائماً.
  */
 export function isAIConfigured(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY);
+  return hasAnyAiKey();
 }
 
 const CATEGORY_KEYWORDS: Record<Category, RegExp> = {
@@ -154,32 +155,18 @@ function cleanJson(text: string): string {
 export async function analyzeWithAI(entry: RawEntry): Promise<HuntResult | null> {
   if (!isAIConfigured()) return null;
 
-  const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || "";
-  const baseUrl =
-    process.env.OPENAI_BASE_URL ||
-    (process.env.GEMINI_API_KEY
-      ? "https://generativelanguage.googleapis.com/v1beta/openai/"
-      : undefined);
-  const model =
-    process.env.OPENAI_MODEL || process.env.GEMINI_MODEL || "gpt-4o-mini";
+  const userContent = `العنوان: ${entry.title}\nالرابط: ${entry.url}\nالمصدر: ${entry.source}\n\nالنص:\n${entry.text.slice(0, 3000)}`;
 
   try {
-    const { default: OpenAI } = await import("openai");
-    const client = new OpenAI({ apiKey, baseURL: baseUrl });
-    const completion = await client.chat.completions.create({
-      model,
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `العنوان: ${entry.title}\nالرابط: ${entry.url}\nالمصدر: ${entry.source}\n\nالنص:\n${entry.text.slice(0, 3000)}`,
-        },
-      ],
+    const res = await callLlm({
+      task: "hunt",
+      system: SYSTEM_PROMPT,
+      temperature: 0.2,
+      maxOutputTokens: 1500,
+      messages: [{ role: "user", content: userContent }],
     });
 
-    const raw = completion.choices?.[0]?.message?.content ?? "";
+    const raw = res.text;
     if (!raw) return null;
     const parsed = JSON.parse(cleanJson(raw)) as Record<string, any>;
 
@@ -213,7 +200,10 @@ export async function analyzeWithAI(entry: RawEntry): Promise<HuntResult | null>
       confidence: 0.85,
     };
   } catch (err) {
-    console.warn("⚠️ [analyzer] فشل التحليل الذكي:", (err as Error).message);
+    console.warn(
+      "⚠️ [analyzer] فشل التحليل الذكي عبر المزوّدين:",
+      (err as Error).message
+    );
     return null;
   }
 }

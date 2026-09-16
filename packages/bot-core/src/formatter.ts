@@ -160,6 +160,23 @@ export function blockedNote(): string {
   ].join("\n");
 }
 
+/** فقرات الخدمات المرقّمة (بدون ترويسة/تذييل) — تُستخدم في الرد الحواري */
+export function formatServicesBody(services: ServiceRecord[]): string {
+  return services
+    .map((s, i) => {
+      const parts = [
+        `${i + 1}. <b>${esc(s.name)}</b>`,
+        `   ${CATEGORY_LABEL[s.category] ?? s.category} · ${STATUS_LABEL[s.status] ?? s.status}`,
+        `   💎 ${freeTierLine(s)}`,
+        `   📝 ${esc(s.description.slice(0, 110))}`,
+        `   🔗 ${esc(s.activationLink)}`,
+      ];
+      if (s.documentationLink) parts.push(`    ${esc(s.documentationLink)}`);
+      return parts.join("\n");
+    })
+    .join("\n");
+}
+
 /** رسالة واحدة مجمّعة لنتائج البحث */
 export function formatSearchResultsReply(
   query: string,
@@ -169,18 +186,15 @@ export function formatSearchResultsReply(
   const head = query
     ? `🔎 <b>نتائج البحث عن:</b> ${esc(query)}`
     : `🔎 <b>أحدث ما اصطاده الصيّاد:</b>`;
-  const body = services.map((s, i) => {
-    const parts = [
-      `${i + 1}. <b>${esc(s.name)}</b>`,
-      `   ${CATEGORY_LABEL[s.category] ?? s.category} · ${STATUS_LABEL[s.status] ?? s.status}`,
-      `   💎 ${freeTierLine(s)}`,
-      `   📝 ${esc(s.description.slice(0, 110))}`,
-      `   🔗 ${esc(s.activationLink)}`,
-    ];
-    if (s.documentationLink) parts.push(`    ${esc(s.documentationLink)}`);
-    return parts.join("\n");
-  });
-  return [head, "", ...body, "", note, "👇 اضغط زراً للانتقال مباشرة، أو اكتب طلباً آخر بصيغة مختلفة."]
+  const body = formatServicesBody(services);
+  return [
+    head,
+    "",
+    body,
+    "",
+    note,
+    "👇 اضغط زراً للانتقال مباشرة، أو اكتب طلباً آخر بصيغة مختلفة.",
+  ]
     .filter(Boolean)
     .join("\n");
 }

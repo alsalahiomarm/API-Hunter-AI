@@ -91,10 +91,33 @@ async function checkAiProvider() {
     } catch (err) {
       console.log(`   ⚠️ تعذّر التحقق من مفتاح Gemini: ${(err as Error).message}`);
     }
-    return;
+  } else {
+    console.log("   ℹ️ OPENAI_API_KEY مُعيَّن — سيُستخدم مزود OpenAI المتوافق للتحليل الذكي.");
   }
 
-  console.log("   ℹ️ OPENAI_API_KEY مُعيَّن — سيُستخدم مزود OpenAI المتوافق للتحليل الذكي.");
+  // فحص المزوّدين المتعددين (طبقة الذكاء الاصطناعي الجديدة)
+  const bc = await (async () => {
+    try {
+      return await import("@apihunter/bot-core");
+    } catch {
+      return null;
+    }
+  })();
+  if (bc) {
+    try {
+      const providers = await bc.probeAiProviders();
+      if (providers.length) {
+        console.log("   ⚙️  المزوّدون المتعددون (طلب/صلاحية):");
+        for (const p of providers) {
+          console.log(
+            `      ${p.ok ? "✅" : "⚠️"} ${p.provider.padEnd(12)} ${p.detail}${p.ok ? "" : " — سيُتخطَّى تلقائياً"}`)
+          ;
+        }
+      }
+    } catch (err) {
+      console.log(`   ⚠️ تعذّر فحص المزوّدين المتعددين: ${(err as Error).message}`);
+    }
+  }
 }
 
 async function main() {

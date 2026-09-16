@@ -78,3 +78,14 @@ model UserLog {
 
   @@index([telegramId, createdAt])
 }
+
+// ---------- ذاكرة محادثات البوت (سياق متصل لكل مستخدم) ----------
+model ChatMessage {
+  id         String   @id @default(cuid())
+  telegramId String   // معرف مستخدم تليجرام
+  role       String   // user | assistant
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([telegramId, createdAt])
+}

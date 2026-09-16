@@ -155,6 +155,73 @@ export interface UserLogRow {
   at: string;
 }
 
+// ---------------- ذاكرة محادثات البوت (سياق متصل لكل مستخدم) ----------------
+export interface ChatMemoryEntry {
+  role: "user" | "assistant";
+  content: string;
+}
+
+// احتياطي ذاكرة في الذاكرة (عند غياب قاعدة البيانات أو في البيئات عديمة الحالة)
+const chatMem = new Map<string, ChatMemoryEntry[]>();
+
+export async function saveChatMessage(
+  telegramId: string,
+  role: "user" | "assistant",
+  content: string
+) {
+  const text = content.trim().slice(0, 4000);
+  if (!text) return;
+  if (isDbConfigured()) {
+    try {
+      const db = await import("@apihunter/db");
+      await db.prisma.chatMessage.create({
+        data: { telegramId, role, content: text },
+      });
+      return;
+    } catch { /* نكمل نحو الذاكرة المحلية */ }
+  }
+  const arr = chatMem.get(telegramId) ?? [];
+  arr.push({ role, content: text });
+  if (arr.length > 40) arr.shift();
+  chatMem.set(telegramId, arr);
+}
+
+/** آخر المحادثة بترتيبها الزمني (الأقدم أولاً) — تُرسل للنموذج في كل طلب */
+export async function getChatHistory(
+  telegramId: string,
+  limit = 16
+): Promise<ChatMemoryEntry[]> {
+  if (isDbConfigured()) {
+    try {
+      const db = await import("@apihunter/db");
+      const rows = await db.prisma.chatMessage.findMany({
+        where: { telegramId },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      });
+      return rows
+        .reverse()
+        .map((r: { role: string; content: string }) => ({
+          role: r.role === "assistant" ? ("assistant" as const) : ("user" as const),
+          content: r.content,
+        }));
+    } catch { /* نكمل نحو الذاكرة المحلية */ }
+  }
+  const arr = chatMem.get(telegramId) ?? [];
+  return arr
+    .slice(-limit)
+    .map(({ role, content }) => ({ role, content }));
+}
+
+export async function clearChatHistory(telegramId: string) {
+  chatMem.delete(telegramId);
+  if (!isDbConfigured()) return;
+  try {
+    const db = await import("@apihunter/db");
+    await db.prisma.chatMessage.deleteMany({ where: { telegramId } });
+  } catch { /* تجاهل */ }
+}
+
 export async function logUserQuery(params: {
   telegramId: string;
   firstName?: string | null;

@@ -85,6 +85,36 @@ npm run db:link -- "postgresql://postgres.<ref>:<PASSWORD>@<host>:6543/postgres?
 | `AGENT_CONCURRENCY` | `2` | — | داخل سير العمل |
 | `AI_MAX_ATTEMPTS` | `3` | — | داخل سير العمل |
 
+### متغيرات الذكاء الاصطناعي متعدد المزوّدات (جديد)
+
+طبقة موحّدة تجرّب المزوّدين ترتيب حسب المهمة وتتحوّل تلقائياً عند 429/5xx/خطأ، وتدور بين مفاتيح كل مزوّد:
+
+| المتغيّر | مثال القيمة | الوصف |
+|---|---|---|
+| `GEMINI_API_KEYS` | مفتاح من aistudio | قائمة مفاتيح (فواصل) — مع تفعيل Google Search Grounding |
+| `OPENROUTER_API_KEYS` | `sk-or-v1-...` | OpenRouter (نماذج متعددة) |
+| `GROQ_API_KEYS` | `gsk_...` | Groq — مهمة `hunt` (نموذج `qwen/qwen3.8-27b`) |
+| `DEEPSEEK_API_KEY` | `sk-...` | DeepSeek (احتياطي — يتخطى عند نقص الرصيد) |
+| `MISTRAL_API_KEY` | مفتاح Mistral | احتياطي محادثة |
+| `COHERE_API_KEY` | مفتاح Cohere | احتياطي — صيغة `message` + `chat_history` |
+| `OPENAI_API_KEYS` | `sk-...` | اختياري |
+| `SERPER_API_KEY` | مفتاح serper.dev | بحث جوجل (Grounding إضافي للبوت) |
+| `FIRECRAWL_API_KEY` | `fc-...` | بحث + كشط |
+| `JINA_API_KEY` | `jina_...` | قراءة/بحث |
+| `AI_TEMPERATURE` / `AI_TOP_P` / `AI_TOP_K` | `0.35` / `0.8` / `40` | معايير التوليد الافتراضية |
+
+ترتيب محادثة البوت: **Gemini (مع Grounding) → OpenRouter → DeepSeek → Mistral → OpenAI → Groq → Cohere**.
+ترتيب تحليل الاصطياد (`hunt`): **Groq → DeepSeek → OpenRouter → Gemini → Mistral → OpenAI → Cohere**.
+
+نشر المتغيرات على Vercel ثم إعادة النشر:
+
+```bash
+echo "VALUE" | vercel env add OPENROUTER_API_KEYS production
+vercel --prod --yes
+```
+
+> 💡 ذاكرة المحادثة لكل مستخدم تُحفظ في جدول `ChatMessage` (قاعدة البيانات) وتُرسل السجلات السابقة مع كل طلب — مسحها بـ `/reset` في البوت.
+
 > ⚠️ لا ترفع `.env` إلى Git أبداً (مستثنى في `.gitignore`).
 
 ---
