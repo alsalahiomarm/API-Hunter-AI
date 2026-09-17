@@ -8,15 +8,25 @@ import type { ServiceRecord } from "@apihunter/db";
  * تأتي من البيانات بنسخة واحدة فقط (عربية أو إنجليزية حسب المصدر)، لذا كان
  * الوصف يظهر بالإنجليزية في الصفحة العربية، والخطة تظهر بالعربية في الصفحة الإنجليزية.
  *
- * الحل: قاموس لكل خدمة (بالمعرّف slug) يوفّر النص باللغتين، مع إرجاع القيمة
- * المخزنة كاحتياط عند غياب الخدمة من القاموس (خدمات جديدة يكتشفها الوكيل).
+ * الحل: ترتيب أولويات موحّد عند طلب أي نص:
+ *   1) قاموس الخدمة SERVICE_I18N (بالمعرّف slug) — الترجمة المعتمدة لكل خدمة.
+ *   2) قاموس العبارات PHRASE_I18N — قيم الرصيد القصيرة المتكررة في البيانات.
+ *   3) ترجمة ملاحظات الاكتشاف الآلي: "مصدر الاكتشاف: X" تتحول إلى "Source: X".
+ *   4) احتياط القيمة المخزنة، مع منع ظهور نص بلغة تخالف لغة الصفحة.
+ *
+ * صيانة: كل خدمة جديدة يكتشفها الوكيل يُضاف لها وصف عربي (ar) هنا؛ وإلا ظهر
+ * تنبيه "الترجمة العربية قريباً" في الصفحة العربية بدل نص إنجليزي.
  */
 
 type ServiceField = "description" | "freeCredits" | "rateLimit" | "notes";
 
 interface ServiceCopy {
   ar: string;
-  en: string;
+  /**
+   * اختيارية: عند غيابها تُستخدم القيمة المخزنة في قاعدة البيانات.
+   * (الخدمات المكتشفة آلياً أوصافها مخزّنة بالإنجليزية أصلاً، فلا حاجة لتكرارها.)
+   */
+  en?: string;
 }
 
 interface ServiceStrings {
@@ -321,11 +331,731 @@ const SERVICE_I18N: Record<string, ServiceStrings> = {
       en: "The Hobby plan lets you deploy unlimited projects without a card.",
     },
   },
+
+  // ===================== خدمات مكتشفة آلياً (ترجمات يدوية) =====================
+
+  // الأوصاف مخزّنة بالإنجليزية في قاعدة البيانات، لذا تكفي الترجمة العربية (ar)
+  // هنا، وتُضاف (en) عند الحاجة لتنظيف نص المصدر أو تصحيح لغة مخزّنة.  //
+
+  "admin-console-api-key-isolation-4-limits-for-internal-logistics-spend": {
+    description: {
+      ar: "عزل مفاتيح API في لوحة التحكم: خصّص مفتاحاً ضيق الصلاحيات لكل مستخدم، وأبقِه منفصلاً عن بيانات الإنتاج مع تدوير دوري وتتبّع للاستخدام.",
+      en: "A guide to API key isolation in an internal logistics console: give the console its own narrowly scoped key, separate it from the production credential, rotate both on schedule, and attribute usage per key.",
+    },
+  },
+  "aviationstack": {
+    description: {
+      ar: "واجهة عالمية لتتبع الطائرات والرحلات والخطوط الجوية والمطارات في الوقت الفعلي، مناسبة لمنصات السفر وتطبيقات تتبع الرحلات.",
+      en: "A reliable travel API for tracking flights, airlines, airports, routes, and schedules worldwide — built for travel platforms, flight tracking apps, and logistics tools.",
+    },
+  },
+  "media-billing-after-a-leaked-api-key-evidence-preserving-compromise-report-runb": {
+    description: {
+      ar: "درس تقني عن التعامل مع تسريب مفاتيح API في أنظمة الفوترة: أوقف الصلاحية فوراً واحفظ الأدلة لحساب الفوترة بدقة.",
+      en: "How to handle a leaked API key in billing systems: revoke access immediately while preserving evidence so media events are still billed correctly.",
+    },
+  },
+  "oddsbench": {
+    description: {
+      ar: "قياس أداء شهري مستقل لواجهات احتمالات الرهانات الرياضية، مع بيانات JSON وCSV مجانية.",
+    },
+  },
+  "framejet": {
+    description: {
+      ar: "واجهة لالتقاط لقطات شاشة للمواقع مع إزالة لافتات الكوكيز ونوافذ الدردشة، بطبقة مجانية.",
+    },
+  },
+  "an-image-to-video-ai-tutorial-for-developers-tired-of-juggling-five-different-ap": {
+    description: {
+      ar: "درس تقني عن تحويل الصور إلى فيديو عبر واجهات الذكاء الاصطناعي بلا الحاجة لإدارة عدة مفاتيح مختلفة.",
+      en: "A step-by-step image-to-video AI tutorial for developers who are tired of juggling several providers and API keys.",
+    },
+  },
+  "how-to-implement-function-calling-with-structured-outputs": {
+    description: {
+      ar: "دليل لتطبيق استدعاء الدوال (Function Calling) والنواتج المنظمة في نماذج اللغة.",
+      en: "A guide to implementing function calling (tool use) with structured outputs so models return machine-usable data instead of free text.",
+    },
+  },
+  "runyankole-bible-api": {
+    description: {
+      ar: "واجهة برمجة تطبيقات REST مجانية للكتاب المقدس بلغة رونيانكوري-روكيجا (Runyankore-Rukiga)، تتضمن 66 سفراً و31,106 آية.",
+      en: "Free REST API for the Runyankore-Rukiga Bible — 66 books, 31,106 verses.",
+    },
+  },
+  "top-10-developer-tools-apis-scrapers-in-2026": {
+    description: {
+      ar: "قائمة بأفضل 10 أدوات وواجهات وبرامج كشط للمطورين في 2026 حسب عدد المستخدمين.",
+      en: "The top 10 most popular developer tools, APIs, and scrapers on Apify in 2026, ranked by active users.",
+    },
+  },
+  "ipstack": {
+    description: {
+      ar: "واجهة تحديد الموقع الجغرافي للعنوان IP في الوقت الفعلي مع أكثر من 100 حقل تشمل الموقع ومزود الخدمة والمنطقة الزمنية.",
+      en: "Real-time IP geolocation API with 100+ data fields including location, ISP, timezone, currency, and security threat detection.",
+    },
+  },
+  "best-finance-apis-for-developers-in-2026": {
+    description: {
+      ar: "أفضل واجهات البيانات المالية للمطورين لعام 2026 من منصة APILayer.",
+      en: "The best finance data APIs for developers on APILayer in 2026, including real-time, intraday, and historical market data.",
+    },
+  },
+  "building-a-full-stack-e-commerce-site-google-oauth-apis-and-real-world-problem": {
+    description: {
+      ar: "درس عملي عن بناء متجر إلكتروني متكامل باستخدام OAuth من Google وواجهات برمجية ومشاكل واقعية.",
+      en: "A practical walkthrough of building a full-stack e-commerce site with Google OAuth, Supabase, Netlify, and real-world problem solving.",
+    },
+  },
+  "how-to-scrape-any-social-media-platform-in-2026": {
+    description: {
+      ar: "دليل كشط بيانات منصات التواصل الاجتماعي في 2026 للبحث والتسويق وتدريب نماذج الذكاء الاصطناعي.",
+      en: "The best tools for scraping social media platforms in 2026 for research, marketing, and AI training — without maintaining your own proxy infrastructure.",
+    },
+  },
+  "freelancer-api": {
+    description: {
+      ar: "واجهة برمجة تطبيقات تتيح التفاعل برمجياً مع منصة Freelancer لإدارة المشاريع، تصفح الوظائف، والتوظيف.",
+      en: "An API to interact programmatically with the Freelancer platform: manage projects, browse jobs, and hire.",
+    },
+  },
+  "upres": {
+    description: {
+      ar: "خدمة رفع جودة ودقة الصور بالذكاء الاصطناعي حتى دقة 8K باستخدام 18 نموذجاً مختلفاً.",
+      en: "AI image upscaling service up to 8K resolution using 18 different models.",
+    },
+  },
+  "7-smtp-apis-worth-knowing-in-2026-and-where-id-start": {
+    description: {
+      ar: "سبع واجهات بريد إلكتروني (SMTP) جديرة بالمعرفة في 2026 وأين تبدأ منها.",
+      en: "Seven SMTP/email APIs worth knowing in 2026 and where to start with each, based on hands-on use.",
+    },
+  },
+  "find-companies-using-contentful-cms-via-api-2026-guide": {
+    description: {
+      ar: "دليل لاكتشاف الشركات التي تستخدم نظام Contentful لإدارة المحتوى عبر الواجهة البرمجية (2026).",
+      en: "A 2026 guide to finding companies that run the Contentful CMS, discovered through their API.",
+    },
+  },
+  "four-ways-reasoning-models-hide-their-thinking-and-what-that-does-to-your-bill": {
+    description: {
+      ar: "أربع طرق تخفي بها نماذج التفكير خطواتها، وما تأثير ذلك على فاتورتك.",
+      en: "How four reasoning models hide their thinking — four wire formats and billing behaviors that affect your audit trail and your bill.",
+    },
+  },
+  "freetogame": {
+    description: {
+      ar: "قاعدة بيانات الألعاب المجانية Free-To-Play.",
+    },
+  },
+  "gofile": {
+    description: {
+      ar: "رفع ملفات بحجم غير محدود مجاناً.",
+    },
+  },
+  "the-dog": {
+    description: {
+      ar: "خدمة عامة كل ما تريد معرفته عن الكلاب، مجانية للاستخدام في تطبيقاتك ومواقعك.",
+    },
+  },
+  "how-to-validate-phone-numbers-via-api": {
+    description: {
+      ar: "طريقة التحقق من أرقام الهواتف عبر واجهة برمجية بدلاً من بناء حلول مخصصة مكلفة.",
+      en: "How to validate phone numbers via an API instead of building slow custom solutions or paying for overkill enterprise plans.",
+    },
+  },
+  "how-to-get-real-time-stock-market-data-via-api": {
+    description: {
+      ar: "طريقة الحصول على بيانات سوق الأسهم في الوقت الفعلي عبر واجهة برمجية موثوقة.",
+      en: "How to get real-time stock market data via an API for finance apps and trading bots without fragile custom scrapers.",
+    },
+  },
+  "build-a-multi-model-ai-chatbot-in-15-minutes-one-api-key-for-deepseek-glm-and": {
+    description: {
+      ar: "ابنِ بوت محادثة ذكاء اصطناعي متعدد النماذج في 15 دقيقة بمفتاح واحد لـ DeepSeek وGLM وغيرهما.",
+      en: "Build a multi-model AI chatbot in 15 minutes using one API key for DeepSeek, GLM, and other models.",
+    },
+  },
+  "show-hn-jan-nano-4b-agentic-model-that-outperforms-deepseek-v3-671b-using-mcp": {
+    description: {
+      ar: "نموذج Jan-nano بحجم 4 مليارات معلمة يتفوق على DeepSeek-v3-671B باستخدام MCP لاستدعاء الأدوات.",
+      en: "Jan-nano, a 4B model trained for MCP tool use, tops DeepSeek-V3-671B on tool-use benchmarks and handles live web search and multi-step deep research.",
+    },
+  },
+  "show-hn-dyad": {
+    description: {
+      ar: "أداة مجانية مفتوحة المصدر لبناء تطبيقات الذكاء الاصطناعي محلياً.",
+      en: "A free, local, open-source AI app builder you can download and run on your own machine.",
+    },
+  },
+  "show-hn-bullsh-financial-modeling-agent-cli": {
+    description: {
+      ar: "أداة سطر أوامر مجانية مفتوحة المصدر للتحليل المالي والنمذجة عبر وكيل ذكاء اصطناعي.",
+      en: "A free open-source agentic CLI for financial modeling and analysis that queries and stores 10-Qs and 10-Ks in a local vector store.",
+    },
+  },
+  "show-hn-klipy": {
+    description: {
+      ar: "منصة واجهات برمجية لملفات GIF والملصقات والميمات والمقاطع والمحتوى المولّد بالذكاء الاصطناعي.",
+      en: "An API-first platform for GIFs, stickers, memes, emojis, clips, and AI-generated content — a solid alternative as GIPHY goes paid and Tenor shuts down.",
+    },
+  },
+  "show-hn-opik-an-open-source-llm-evaluation-framework": {
+    description: {
+      ar: "إطار عمل مفتوح المصدر لتقييم نماذج اللغة الكبيرة (LLM).",
+      en: "Opik is an open-source framework for evaluating LLM applications, focused on making evals easier to write and maintain.",
+    },
+  },
+  "show-hn-browse-hn-together-in-threejs": {
+    description: {
+      ar: "تصفّح Hacker News بشكل جماعي في بيئة ثلاثية الأبعاد عبر Three.js.",
+      en: "A multiplayer, embeddable virtual computer that lets people browse Hacker News together, including inside 3D spaces built with Three.js.",
+    },
+  },
+  "the-guide-to-free-ai-api-keys-6-platforms-you-need-to-know": {
+    description: {
+      ar: "دليل مفاتيح الذكاء الاصطناعي المجانية: 6 منصات يجب أن تعرفها.",
+    },
+  },
+  "show-hn-forge": {
+    description: {
+      ar: "أداة طرفية تجلب الذكاء الاصطناعي إلى بيئة تطويرك لمساعدتك في البرمجة والتصحيح.",
+      en: "Forge is a terminal tool that brings AI into your development workflow for coding, debugging, and problem-solving without leaving the command line.",
+    },
+  },
+  "markly": {
+    description: {
+      ar: "إضافة علامة مائية على الصور من Claude عبر MCP، مجانية وبدون مفتاح API.",
+    },
+  },
+  "a-dex-aggregator-whose-quotes-are-computed-on-chain-free-api-no-key": {
+    description: {
+      ar: "مجمّع أسعار لامركزي (DEX) تُحتسب أسعاره على السلسلة مباشرة، بواجهة مجانية بدون مفتاح.",
+    },
+  },
+  "show-hn-free-api-keys-for-open-models-llama-qwen-gpt-oss-gemma": {
+    description: {
+      ar: "مفاتيح API مجانية لنماذج مفتوحة المصدر: Llama وQwen وGPT-OSS وGemma.",
+    },
+  },
+  "were-announcing-an-extension-of-free-twitter-api-access-through-february-13": {
+    description: {
+      ar: "إعلان عن تمديد الوصول المجاني إلى واجهة تويتر حتى 13 فبراير.",
+    },
+  },
+  "show-hn-free-api-to-block-disposable-emails": {
+    description: {
+      ar: "واجهة مجانية لحظر البريد الإلكتروني المؤقت (القابل للتخلص).",
+    },
+  },
+  "twitter-replaces-its-free-api-with-a-paid-tier-in-quest-to-make-more-money": {
+    description: {
+      ar: "تويتر يستبدل واجهته المجانية بخطة مدفوعة بحثاً عن المزيد من الإيرادات.",
+    },
+  },
+  "a-collective-list-of-free-apis": {
+    description: {
+      ar: "قائمة مجمّعة من الواجهات البرمجية المجانية.",
+    },
+  },
+  "adventures-in-running-a-free-public-api": {
+    description: {
+      ar: "خبرة عملية في تشغيل وإدارة واجهة برمجية عامة مجانية.",
+    },
+  },
+  "show-hn-free-openai-api-access-with-chatgpt-account": {
+    description: {
+      ar: "وصول مجاني لواجهة OpenAI من خلال حساب ChatGPT.",
+    },
+  },
+  "textbelt-is-a-free-api-for-outgoing-sms": {
+    description: {
+      ar: "اكتشفه وكيل الاصطياد تلقائياً.",
+      en: "Auto-discovered by the hunting agent.",
+    },
+  },
+  "show-hn-kanyerest": {
+    description: {
+      ar: "واجهة REST مجانية لاقتباسات Kanye West العشوائية.",
+    },
+  },
+  "google-is-discontinuing-their-free-weather-api": {
+    description: {
+      ar: "جوجل تُوقف واجهة الطقس المجانية الخاصة بها.",
+    },
+  },
+  "show-hn-i-built-a-free-oembed-api-for-the-web": {
+    description: {
+      ar: "واجهة oEmbed مجانية لتضمين محتوى الويب في مواقعك.",
+    },
+  },
+  "show-hn-free-api-service-for-crypto-and-foreign-exchange-rates": {
+    description: {
+      ar: "واجهة مجانية لأسعار العملات الرقمية وأسعار الصرف الأجنبي.",
+    },
+  },
+  "hosted-microsoft-ocr-library-free-ocr-api-web-service": {
+    description: {
+      ar: "مكتبة OCR من مايكروسوفت مستضافة: واجهة ويب مجانية لاستخراج النصوص من الصور.",
+    },
+  },
+  "hoppscotch": {
+    description: {
+      ar: "أداة مجانية سريعة لإنشاء واختبار طلبات الواجهات البرمجية.",
+    },
+  },
+  "free-json-api-to-instantly-check-the-spam-score-of-your-email-messages": {
+    description: {
+      ar: "واجهة JSON مجانية لفحص درجة البريد المزعج في رسائلك فوراً.",
+    },
+  },
+  "public-apis-a-collective-list-of-free-apis": {
+    description: {
+      ar: "قائمة مجمّعة واسعة من الواجهات البرمجية المجانية.",
+    },
+  },
+  "show-hn-tiny-fast-and-free-api-to-geolocate-ip-addresses": {
+    description: {
+      ar: "واجهة صغيرة وسريعة ومجانية لتحديد الموقع الجغرافي لعناوين IP.",
+    },
+  },
+  "norwegian-meteorological-institute-has-an-excellent-free-weather-api": {
+    description: {
+      ar: "المعهد النرويجي للأرصاد الجوية يوفّر واجهة طقس مجانية ممتازة.",
+    },
+  },
+  "decommissioning-a-free-public-api": {
+    description: {
+      ar: "درس عن إيقاف تشغيل واجهة برمجية عامة مجانية بأمان.",
+    },
+  },
+  "spacetraders-a-multiplayer-game-built-on-a-free-web-api": {
+    description: {
+      ar: "لعبة متعددة اللاعبين مبنية على واجهة ويب مجانية.",
+    },
+  },
+  "a-collection-of-freepublic-apis-you-can-use-to-build-stuff": {
+    description: {
+      ar: "مجموعة من الواجهات البرمجية المجانية والعامة لبناء مشاريعك.",
+    },
+  },
+  "a-collection-of-free-public-apis-that-is-tested-daily": {
+    description: {
+      ar: "مجموعة من الواجهات العامة المجانية تُختبر يومياً.",
+    },
+  },
+  "weather-api": {
+    description: {
+      ar: "واجهة REST مجانية للاستعلام عن حالة الطقس.",
+    },
+  },
+  "free-url-shortener": {
+    description: {
+      ar: "مختصر روابط مجاني يقدّم واجهة قوية للتفاعل مع المواقع الأخرى.",
+    },
+  },
+  "postmon": {
+    description: {
+      ar: "واجهة للاستعلام عن الرموز البريدية البرازيلية ومتابعة الشحنات بسهولة وسرعة ومجاناً.",
+    },
+  },
+  "lecto-translation": {
+    description: {
+      ar: "واجهة ترجمة بطبقة مجانية وأسعار معقولة.",
+    },
+  },
+  "totalshiftleft-sandbox": {
+    description: {
+      ar: "بيئة تجريبية متعددة البروتوكولات مجاناً: REST وGraphQL وSOAP مع مصادقة OAuth2/JWT ومواصفة OpenAPI 3.0.",
+    },
+  },
+  "trash-nothing": {
+    description: {
+      ar: "مجتمع إعادة تدوير يضم آلاف العناصر المجانية المُهداة يومياً.",
+    },
+  },
+  "privacycom": {
+    description: {
+      ar: "توليد أرقام بطاقات ائتمانية افتراضية مرتبطة بحسابك البنكي لكل متجر على حدة.",
+    },
+  },
+  "iplogs": {
+    description: {
+      ar: "كشف مجاني لعناوين الـ VPN والبروكسي وTor ومراكز البيانات من 13 مصدراً مع فحص نشط.",
+    },
+  },
+  "share": {
+    description: {
+      ar: "مجموعة بيانات مجانية ومفتوحة عن الأبحاث والنشاط الأكاديمي.",
+    },
+  },
+  "orbitalwiki": {
+    description: {
+      ar: "كتالوج لأكثر من 16,000 قمر صناعي يدمج CelesTrak وGCAT وWikidata، مع طبقة مجانية.",
+    },
+  },
+  "pexafy": {
+    description: {
+      ar: "بحث دلالي عن الصور عبر 9+ مصادر صور مجانية بنظام JSON موحّد.",
+    },
+  },
+  "quotable-quotes": {
+    description: {
+      ar: "واجهة اقتباسات مجانية ومفتوحة المصدر.",
+    },
+  },
+  "personalityfyi": {
+    description: {
+      ar: "اختبار مجاني لأنواع الشخصية MBTI وتصحيح اختبارات OEJTS.",
+    },
+  },
+  "tilth": {
+    description: {
+      ar: "مؤشر أسعار أسمدة يومي مجاني للتسعيرات في بريطانيا عبر تسع درجات، برخصة CC BY 4.0.",
+    },
+  },
+  "open-scholarships": {
+    description: {
+      ar: "دليل مجاني بمصادر رسمية لمنح الولايات المتحدة الدراسية والمساعدات المالية للطلاب.",
+    },
+  },
+  "noozra": {
+    description: {
+      ar: "عناوين أخبار مجانية من أكثر من 200 مصدر RSS مُنسّق.",
+    },
+  },
+  "mediastack": {
+    description: {
+      ar: "واجهة REST مجانية وبسيطة للأخبار الحية ومقالات المدونات.",
+    },
+  },
+  "sunor": {
+    description: {
+      ar: "واجهة توليد موسيقى بالذكاء الاصطناعي عبر Suno برصيد مرن (ادفع ما تستخدمه).",
+    },
+  },
+  "freesound": {
+    description: {
+      ar: "مكتبة عينات صوتية وموسيقية مجانية.",
+    },
+  },
+  "messengerxio": {
+    description: {
+      ar: "واجهة مجانية للمطورين لبناء تطبيقات الدردشة المخصصة بالذكاء الاصطناعي وتحقيق الربح منها.",
+    },
+  },
+  "jina-ai": {
+    description: {
+      ar: "واجهة ذكاء اصطناعي مجانية للتضمينات (Embeddings) وإعادة الترتيب ومعالجة النصوص.",
+    },
+  },
+  "groq": {
+    description: {
+      ar: "واجهة استنتاج ذكاء اصطناعي سريعة بطبقة مجانية تدعم نماذج Llama وMixtral وGemma.",
+    },
+  },
+  "ai-for-thai": {
+    description: {
+      ar: "واجهات ذكاء اصطناعي تايلاندية متنوعة مجانية.",
+    },
+  },
+  "freehire": {
+    description: {
+      ar: "محرك بحث مفتوح المصدر يجمع وظائف التقنية من لوحات التوظيف الرسمية للشركات.",
+    },
+  },
+  "cure-cancer-with-ai": {
+    description: {
+      ar: "بيانات أبحاث الأورام والتجارب السريرية وموافقات FDA والأخبار وتنبؤات MAMMAL.",
+    },
+  },
+  "indian-mandi-prices": {
+    description: {
+      ar: "أسعار سوق الجملة اليومية مجاناً وبدون مفتاح لـ 5 ولايات هندية من data.gov.in.",
+    },
+  },
+  "ai-law-tracker": {
+    description: {
+      ar: "قوانين تنظيم الذكاء الاصطناعي حسب الدولة (أمريكا وأوروبا والعالم) بصيغة JSON للقراءة فقط مع طبقة مجانية.",
+    },
+  },
+  "ipgeolocation": {
+    description: {
+      ar: "واجهة تحديد الموقع الجغرافي لـ IP مع خطة مجانية 30 ألف طلب شهرياً.",
+    },
+  },
+  "ipgeo": {
+    description: {
+      ar: "واجهة تحديد IP مجانية وغير محدودة مع معلومات مفيدة.",
+    },
+  },
+  "ip-vigilante": {
+    description: {
+      ar: "واجهة تحديد الموقع الجغرافي لعناوين IP مجانية.",
+    },
+  },
+  "astroworld": {
+    description: {
+      ar: "بيانات ماين كرافت مجانية: مخلوقات وبيئات وعناصر وتعاويذ وبنى وأوامر وإصدارات وإنجازات وتبادلات.",
+    },
+  },
+  "farmdash": {
+    description: {
+      ar: "ذكاء مالي لامركزي: تقييم مخاطر البروتوكولات ومحاكاة العوائد مع 84 أداة MCP وطبقة Scout مجانية.",
+    },
+  },
+  "open-meteo": {
+    description: {
+      ar: "واجهة طقس مجانية للاستخدامات غير التجارية.",
+    },
+  },
+  "justmemewtf": {
+    description: {
+      ar: "واجهة ميمات مجانية تضم 2400+ قالب مع البحث والشائع والتوليد بالذكاء الاصطناعي.",
+    },
+  },
+  "smtpfast": {
+    description: {
+      ar: "إرسال البريد المعاملاتي وإدارة جهات الاتصال والنشرات، مجاناً حتى 3000 بريد شهرياً.",
+    },
+  },
+  "improvmx": {
+    description: {
+      ar: "واجهة لخدمة إعادة توجيه البريد الإلكتروني المجانية.",
+    },
+  },
+  "vector-express-v20": {
+    description: {
+      ar: "واجهة مجانية لتحويل الملفات المتجهة (Vector).",
+    },
+  },
+  "printsocket": {
+    description: {
+      ar: "أرسل ملفات PDF وملصقات ZPL وإيصالات ESC/POS إلى طابعاتك من أي لغة برمجة؛ بطبقة مجانية.",
+    },
+  },
+  "polydoc": {
+    description: {
+      ar: "تحويل HTML والروابط إلى PDF ولقطات شاشة، مع الفواتير الإلكترونية Factur-X/ZUGFeRD؛ طبقة مجانية.",
+    },
+  },
+  "pdfmint": {
+    description: {
+      ar: "تحويل HTML أو Markdown أو رابط إلى PDF أو PNG مع نقطة تجربة بدون مفتاح وطبقة مجانية.",
+    },
+  },
+  "ocrspace": {
+    description: {
+      ar: "استخراج النصوص من الصور وملفات PDF عبر OCR مع طبقة مجانية.",
+    },
+  },
+  "ilovepdf": {
+    description: {
+      ar: "تحويل ودمج وتقسيم واستخراج نصوص وإضافة ترقيم صفحات لملفات PDF، مجاناً حتى 250 ملفاً شهرياً.",
+    },
+  },
+  "free-dictionary": {
+    description: {
+      ar: "تعريفات ونطق وأنواع كلام وأمثلة ومرادفات من قاموس مجاني.",
+    },
+  },
+  "tinymind-agent-tools": {
+    description: {
+      ar: "واجهات مجانية من وكيل ذكاء اصطناعي: البحث عن ممثل، كلمة اليوم، قصائد، نكات، وفحص الاتصال.",
+    },
+  },
+  "talordata": {
+    description: {
+      ar: "بيانات نتائج محركات البحث (SERP) مع تجربة مجانية.",
+    },
+  },
+  "statically": {
+    description: {
+      ar: "شبكة CDN مجانية للمطورين.",
+    },
+  },
+  "shotanvil": {
+    description: {
+      ar: "واجهة لالتقاط الشاشات وتحويل HTML إلى PDF مع طبقة مجانية ومصادقة API key أو x402.",
+    },
+  },
+  "savepageio": {
+    description: {
+      ar: "واجهة REST مجانية لالتقاط لقطات شاشة لمواقع سطح المكتب أو الجوال.",
+    },
+  },
+  "proxyforge": {
+    description: {
+      ar: "قائمة مجانية محدّثة تلقائياً من البروكسيات المختبرة (HTTP/HTTPS/SOCKS4/SOCKS5) تُحدَّث كل 6 ساعات.",
+    },
+  },
+  "peak": {
+    description: {
+      ar: "حل تحديات Cloudflare Turnstile وألغاز الخمس ثوانٍ، تدفع مقابل كل حل ناجح مع 1000 حل مجاني.",
+    },
+  },
+  "jsonbinio": {
+    description: {
+      ar: "تخزين JSON مجاني مثالي للتطبيقات والمواقع والجوال الصغيرة.",
+    },
+  },
+  "brewpage": {
+    description: {
+      ar: "استضافة مجانية لـ HTML وJSON وKey-Value وملفات ومواقع متعددة الصفحات مع روابط قصيرة واحتفاظ TTL.",
+    },
+  },
+  "amazonscraperapi": {
+    description: {
+      ar: "كشط منتجات وبحث ودفعات أمازون عبر بروكسيات سكنية (1000 طلب مجاني).",
+    },
+  },
+  "exchangeratedev": {
+    description: {
+      ar: "أسعار صرف حية وتاريخية، 168 زوجاً حتى عام 1999، متوافقة مع Frankfurter، مجاناً 10K شهرياً.",
+    },
+  },
+  "exchangerate-api": {
+    description: {
+      ar: "تحويل عملات مجاني.",
+    },
+  },
+  "economiaawesome": {
+    description: {
+      ar: "أسعار عملات برتغالية مجانية وتحويل بلا حدود معدل.",
+    },
+  },
+  "currencyfreaks": {
+    description: {
+      ar: "أسعار صرف حالية وتاريخية مع خطة مجانية 1K طلب شهرياً.",
+    },
+  },
+  "currencybeacon": {
+    description: {
+      ar: "أسعار صرف لحظية وتاريخية مع طبقة مجانية.",
+    },
+  },
+  "currency-api": {
+    description: {
+      ar: "واجهة أسعار صرف مجانية تضم 150+ عملة بدون حدود معدل.",
+    },
+  },
+  "amdoren": {
+    description: {
+      ar: "واجهة عملات مجانية تضم أكثر من 150 عملة.",
+    },
+  },
+  "exchangeratehost": {
+    description: {
+      ar: "واجهة مجانية لأسعار الصرف الأجنبي والعملات الرقمية.",
+    },
+  },
+  "hostdefi": {
+    description: {
+      ar: "درجات أمان مجانية A+ حتى F للرموز عبر سلاسل Solana وEVM.",
+    },
+  },
+  "web3-storage": {
+    description: {
+      ar: "مشاركة وتخزين ملفات مجاني بمساحة 1 تيرابايت.",
+    },
+  },
+  "pantry": {
+    description: {
+      ar: "تخزين JSON مجاني للمشاريع الصغيرة.",
+    },
+  },
+  "tradedatahub": {
+    description: {
+      ar: "بيانات مقاولي الولايات المتحدة مع واجهة اكتشاف مجانية للتغطية والأسعار والمعاينات.",
+    },
+  },
+  "freelancer": {
+    description: {
+      ar: "توظيف المطورين والمستقلين لإنجاز الأعمال.",
+    },
+  },
+  "runyankole-bible": {
+    description: {
+      ar: "واجهة REST مجانية للكتاب المقدس بلغة Runyankore-Rukiga — 66 سفراً و31106 آية.",
+    },
+  },
+  "twzrd-agent-intel": {
+    description: {
+      ar: "تقييم ثقة وكلاء الذكاء الاصطناعي على سلسلة Solana عبر MCP؛ 4 أدوات مجانية لتسجيل النقاط والتحقق من محافظ الوكلاء.",
+    },
+  },
+  "quran-api": {
+    description: {
+      ar: "واجهة قرآن كريم مجانية بأكثر من 90 لغة و400 ترجمة.",
+    },
+  },
+  "bible-api": {
+    description: {
+      ar: "واجهة برمجية مجانية للحصول على نصوص الكتاب المقدس بعدة لغات وترجمات مختلفة دون الحاجة لمفتاح API.",
+      en: "Free API for Bible texts in multiple languages and translations, no API key required.",
+    },
+  },
+  "the-dog-api": {
+    description: {
+      ar: "واجهة برمجية توفر بيانات وصوراً ومعلومات شاملة ومفصلة عن مختلف سلالات الكلاب.",
+      en: "An API providing comprehensive data, images, and details about different dog breeds.",
+    },
+  },
 };
 
 /**
+ * قاموس عبارات مشترك: القيم القصيرة المتكررة في بيانات الخطة المجانية
+ * (مثل "مجاني بالكامل وبدون مفتاح") تأتي من الوكيل بالعربية فقط، وترجمتها هنا
+ * تغطي كل الخدمات المكتشفة آلياً دون الحاجة لإدخال يدوي لكل خدمة.
+ */
+const PHRASE_I18N: Record<string, string> = {
+  "مجاني بالكامل وبدون مفتاح": "Completely free, no key required",
+  "مجاني بالكامل وبدون API key": "Completely free, no API key required",
+  "مجاني 100%": "100% free",
+  "خطة Free دائمة": "Permanent Free plan",
+  "طبقة مجانية دائمة (10k طلبات/شهر)": "Permanent free tier (10K requests/month)",
+  "طبقة مجانية دائمة بدون بطاقة": "Permanent free tier, no card",
+  "مشروع مجاني دائم": "One free project, forever",
+  "خطة Experiment مجانية": "Free Experiment plan",
+  "Hobby Plan مجاني": "Free Hobby plan",
+  "رصيد مجاني عند التسجيل (500 نقطة تقريباً)": "Free credits on signup (~500 points)",
+  "$10 رصيد مجاني عند التسجيل": "$10 free credit on signup",
+  "10 آلاف رصيد شهرياً": "10K credits/month",
+  "1000 رصيد شهرياً": "1,000 credits/month",
+  "2000 استعلام شهرياً": "2,000 queries/month",
+  "100 استعلام مجاناً يومياً": "100 free queries/day",
+  "100 بحث مجاناً شهرياً": "100 free searches/month",
+  "50 بحث مجاناً شهرياً": "50 free searches/month",
+  "100 بحث مجاني": "100 free searches",
+  "2500 بحث مجاني": "2,500 free searches",
+  // قيم رصيد مخزّنة بالعربية في خدمات مفردة (واجهات الكتاب المقدس ومنصة مستقل)
+  "الخدمة مجانية ومفتوحة بالكامل للاستخدام المباشر دون الحاجة لتسجيل أو مفتاح API":
+    "Fully free and open for direct use—no signup or API key required",
+  "الوصول لحساب المطورين واستخدام الواجهة مجاني للاستخدام العادي":
+    "Developer account access and normal API usage are free",
+  "الخدمة مجانية تماماً ومفتوحة للاستخدام العام بدون مفتاح API أو تسجيل.":
+    "Completely free and open for public use, no API key or signup required.",
+};
+
+/** هل النص يحتوي حروفاً عربية؟ */
+const ARABIC_RE = /[\u0600-\u06FF]/;
+
+/**
+ * ترجمة ملاحظات الاكتشاف الآلي التي يكتبها الوكيل بالعربية
+ * (مثال: "مصدر الاكتشاف: public-apis (GitHub)") — نمط ثابت يغطي كل خدمة جديدة.
+ */
+function localizeAutoNote(text: string, lang: Language): string {
+  if (lang !== "en") return text;
+  const match = /^مصدر الاكتشاف:\s*(.+)$/.exec(text.trim());
+  if (match) return `Source: ${match[1]}`;
+  return text;
+}
+
+/**
  * إرجاع نص الخدمة (وصف/رصيد/حد استخدام/ملاحظات) باللغة المطلوبة.
- * عند غياب الخدمة من القاموس تُرجَع القيمة المخزنة كما هي (احتياط آمن).
+ *
+ * الترتيب: قاموس الخدمة (slug) ← قاموس العبارات المتكررة ← ترجمة ملاحظات الاكتشاف
+ * ← احتياط القيمة المخزنة مع منع ظهور نص بلغة مخالفة للغة الصفحة.
  */
 export function serviceText(
   slug: string,
@@ -334,10 +1064,28 @@ export function serviceText(
   fallback: string | null | undefined
 ): string {
   if (!fallback) return "";
-  const entry = SERVICE_I18N[slug];
-  const copy = entry?.[field];
-  if (copy && copy[lang]) return copy[lang];
-  return fallback;
+
+  const copy = SERVICE_I18N[slug]?.[field];
+  const value = copy ? copy[lang] : undefined;
+  if (value) return value;
+
+  const phrase = PHRASE_I18N[fallback.trim()];
+  if (phrase && lang === "en") return phrase;
+
+  if (field === "notes") return localizeAutoNote(fallback, lang);
+
+  const isArabic = ARABIC_RE.test(fallback);
+  const mismatch = (lang === "ar" && !isArabic) || (lang === "en" && isArabic);
+  if (!mismatch) return fallback;
+
+  // لغة النص المخزّن تخالف لغة الصفحة ولا ترجمة متوفرة بعد:
+  // نُظهر تنبيهاً للوصف فقط، ونتجاهل بقية الحقول بدل عرض نص بلغة مخالفة.
+  if (field === "description") {
+    return lang === "ar"
+      ? "الوصف متوفر بالإنجليزية حالياً، وستُضاف الترجمة العربية قريباً."
+      : "Description is currently available in Arabic only.";
+  }
+  return "";
 }
 
 /** وصف الخدمة باللغة الحالية مع احتياط للقيمة المخزنة. */
