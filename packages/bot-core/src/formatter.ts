@@ -14,13 +14,31 @@ export const CATEGORY_LABEL: Record<string, string> = {
   OTHER: "📦 أخرى",
 };
 
+export const CATEGORY_LABEL_EN: Record<string, string> = {
+  AI_MODELS: "🤖 AI Models",
+  SEARCH_TOOLS: "🔎 Search Tools",
+  AUDIO_IMAGE: "🎙️ Audio & Image",
+  DATABASES: "🗄️ Databases",
+  DEV_TOOLS: "🛠️ Dev Tools",
+  OTHER: "📦 Other",
+};
+
 export const STATUS_LABEL: Record<string, string> = {
   FREE_TIER: "✅ مجاني بالكامل",
   FREE_CREDIT: "💠 رصيد مجاني",
   TRIAL: "⏳ تجربة مؤقتة",
   PENDING: "⏳ قيد التحقق",
-  VERIFIED: "🛡️ موثّق",
+  VERIFIED: "🛡️ موثّد",
   FAILED: "❌ فشل التحقق",
+};
+
+export const STATUS_LABEL_EN: Record<string, string> = {
+  FREE_TIER: "✅ Fully Free",
+  FREE_CREDIT: "💠 Free Credit",
+  TRIAL: "⏳ Trial",
+  PENDING: "⏳ Verifying",
+  VERIFIED: "🛡️ Verified",
+  FAILED: "❌ Failed",
 };
 
 // توضيح علامات HTML داخل str: & < > "

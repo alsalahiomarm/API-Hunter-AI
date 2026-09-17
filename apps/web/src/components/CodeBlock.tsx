@@ -3,6 +3,7 @@
 import { Code2 } from "lucide-react";
 import CopyButton from "@/components/CopyButton";
 import { detectLanguage } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 const LANG_LABEL: Record<string, string> = {
   python: "Python",
@@ -12,6 +13,7 @@ const LANG_LABEL: Record<string, string> = {
 };
 
 export default function CodeBlock({ code }: { code: string }) {
+  const { t } = useI18n();
   const lang = detectLanguage(code);
   return (
     <div className="overflow-hidden rounded-xl border border-white/10 bg-night-950">
@@ -26,7 +28,7 @@ export default function CodeBlock({ code }: { code: string }) {
         dir="ltr"
         className="code-scroll max-h-56 whitespace-pre text-left text-neutral-300"
       >
-        <code>{code || "# لا يوجد مثال كود حالياً"}</code>
+        <code>{code || t("code.noCode")}</code>
       </pre>
     </div>
   );

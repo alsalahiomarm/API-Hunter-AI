@@ -61,14 +61,14 @@ export function categoryMeta(cat: Category): CategoryMeta {
 // ---------- حالات الخدمة ----------
 export const STATUS_META: Record<
   ServiceStatus,
-  { labelAr: string; badge: string }
+  { labelAr: string; labelEn: string; badge: string }
 > = {
-  FREE_TIER: { labelAr: "مجاني بالكامل", badge: "bg-emerald-500/15 text-emerald-300 ring-emerald-400/30" },
-  FREE_CREDIT: { labelAr: "رصيد مجاني", badge: "bg-sky-500/15 text-sky-300 ring-sky-400/30" },
-  TRIAL: { labelAr: "تجربة مؤقتة", badge: "bg-amber-500/15 text-amber-300 ring-amber-400/30" },
-  PENDING: { labelAr: "قيد التحقق", badge: "bg-slate-500/15 text-slate-300 ring-slate-400/30" },
-  VERIFIED: { labelAr: "موثّق", badge: "bg-violet-500/15 text-violet-300 ring-violet-400/30" },
-  FAILED: { labelAr: "فشل التحقق", badge: "bg-red-500/15 text-red-300 ring-red-400/30" },
+  FREE_TIER: { labelAr: "مجاني بالكامل", labelEn: "Fully Free", badge: "bg-emerald-500/15 text-emerald-300 ring-emerald-400/30" },
+  FREE_CREDIT: { labelAr: "رصيد مجاني", labelEn: "Free Credit", badge: "bg-sky-500/15 text-sky-300 ring-sky-400/30" },
+  TRIAL: { labelAr: "تجربة مؤقتة", labelEn: "Trial", badge: "bg-amber-500/15 text-amber-300 ring-amber-400/30" },
+  PENDING: { labelAr: "قيد التحقق", labelEn: "Verifying", badge: "bg-slate-500/15 text-slate-300 ring-slate-400/30" },
+  VERIFIED: { labelAr: "موثّد", labelEn: "Verified", badge: "bg-violet-500/15 text-violet-300 ring-violet-400/30" },
+  FAILED: { labelAr: "فشل التحقق", labelEn: "Failed", badge: "bg-red-500/15 text-red-300 ring-red-400/30" },
 };
 
 export function statusMeta(status: ServiceStatus) {

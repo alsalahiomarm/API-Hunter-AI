@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Send, MessageCircle, MoveUpRight, ShieldCheck } from "lucide-react";
 import { CHANNEL_URL, BOT_URL } from "@/lib/config";
+import { useI18n } from "@/lib/i18n";
 
 interface Stats {
   total: number;
@@ -14,6 +15,7 @@ interface Stats {
 const FALLBACK_STATS: Stats = { total: 0, freeTier: 0, freeCredit: 0, providers: 0 };
 
 export default function Hero() {
+  const { t } = useI18n();
   const [stats, setStats] = useState<Stats>(FALLBACK_STATS);
 
   useEffect(() => {
@@ -28,39 +30,33 @@ export default function Hero() {
       <div className="mx-auto max-w-7xl px-4 pt-16 pb-14 text-center sm:pt-24">
         <span className="badge bg-primary/10 text-primary ring-primary/30 animate-fade-up">
           <ShieldCheck className="h-3.5 w-3.5" />
-          وكيل اصطياد يعمل يومياً على مدار الساعة
+          {t("hero.badge")}
         </span>
 
-        <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-black leading-[1.25] text-white animate-fade-up sm:text-5xl md:text-6xl">
-          اصطاد <span className="text-primary">مفاتيح API مجانية</span>
-          <br />
-          <span className="text-accent">حقيقية</span> و{` `}خطط Free Tier محدّثة
-        </h1>
+        <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-black leading-[1.25] text-white animate-fade-up sm:text-5xl md:text-6xl" dangerouslySetInnerHTML={{ __html: t("hero.title") }} />
 
         <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-400 animate-fade-up">
-          وكيل ذكاء اصطناعي يمسح أدلة GitHub والمنتديات ومدونات المطورين يومياً،
-          يحلّل البيانات، ويتحقق من الروابط، ثم ينشرها هنا وعلى قناة تليجرام
-          فور اكتشافها.
+          {t("hero.description")}
         </p>
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4 animate-fade-up">
           <a href={CHANNEL_URL} target="_blank" rel="noopener noreferrer" className="btn-primary">
             <Send className="h-5 w-5" />
-            انضم لقناة تليجرام
+            {t("hero.joinChannel")}
           </a>
           <a href={BOT_URL} target="_blank" rel="noopener noreferrer" className="btn-ghost">
             <MessageCircle className="h-5 w-5" />
-            جرّب البوت
+            {t("hero.tryBot")}
             <MoveUpRight className="h-4 w-4 opacity-60" />
           </a>
         </div>
 
         {/* شريط الإحصائيات */}
         <div className="mx-auto mt-14 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4 animate-fade-up">
-          <StatCard value={stats.total} label="خدمة مكتشفة" />
-          <StatCard value={stats.freeTier} label="مجانية كلياً" accent="text-emerald-300" />
-          <StatCard value={stats.freeCredit} label="برصيد مجاني" accent="text-sky-300" />
-          <StatCard value={stats.providers} label="مزود مختلف" accent="text-accent" />
+          <StatCard value={stats.total} label={t("hero.stats.total")} />
+          <StatCard value={stats.freeTier} label={t("hero.stats.freeTier")} accent="text-emerald-300" />
+          <StatCard value={stats.freeCredit} label={t("hero.stats.freeCredit")} accent="text-sky-300" />
+          <StatCard value={stats.providers} label={t("hero.stats.providers")} accent="text-accent" />
         </div>
       </div>
     </section>

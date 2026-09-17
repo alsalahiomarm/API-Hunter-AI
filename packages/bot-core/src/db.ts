@@ -1,4 +1,4 @@
-import type { Category, ServiceRecord } from "@apihunter/db";
+import type { Category, ServiceRecord, ServiceStatus } from "@apihunter/db";
 import { seedServices } from "@apihunter/db/seed-data";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
@@ -222,7 +222,56 @@ export async function clearChatHistory(telegramId: string) {
   } catch { /* تجاهل */ }
 }
 
-export async function logUserQuery(params: {
+/** حفظ خدمة مكتشفة من البحث في الإنترنت في قاعدة البيانات */
+export async function saveDiscoveredService(input: {
+  name: string;
+  slug: string;
+  provider: string;
+  category: Category;
+  description: string;
+  freeTier: Record<string, any>;
+  activationLink: string;
+  documentationLink: string;
+  codeExample: string;
+  status: ServiceStatus;
+}): Promise<ServiceRecord | null> {
+  try {
+    if (isDbConfigured()) {
+      const db = await import("@apihunter/db");
+      // تجنب التكرار بالاسم
+      const existing = await db.prisma.apiService.findFirst({ where: { name: input.name } });
+      if (existing) return db.toPublicService(existing);
+
+      const created = await db.prisma.apiService.create({
+        data: {
+          name: input.name,
+          slug: input.slug,
+          provider: input.provider,
+          category: input.category,
+          description: input.description,
+          freeTierDetails: input.freeTier,
+          activationLink: input.activationLink,
+          documentationLink: input.documentationLink,
+          codeExample: input.codeExample,
+          status: input.status,
+        },
+      });
+      return db.toPublicService(created);
+    }
+  } catch (err) {
+    console.warn("[db] تعذّر حفظ الخدمة المكتشفة:", (err as Error).message);
+  }
+  return null;
+}
+
+export async function logUserQuery({
+  telegramId,
+  firstName,
+  username,
+  query,
+  intent,
+  matched,
+}: {
   telegramId: string;
   firstName?: string | null;
   username?: string | null;
@@ -230,7 +279,6 @@ export async function logUserQuery(params: {
   intent: string;
   matched: string[];
 }) {
-  const { telegramId, firstName, username, query, intent, matched } = params;
   if (isDbConfigured()) {
     try {
       const db = await import("@apihunter/db");

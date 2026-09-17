@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Check, Copy } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export default function CopyButton({
   text,
@@ -10,6 +11,7 @@ export default function CopyButton({
   text: string;
   className?: string;
 }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
   const copy = useCallback(async () => {
@@ -32,7 +34,7 @@ export default function CopyButton({
     <button
       type="button"
       onClick={copy}
-      aria-label="نسخ الكود"
+      aria-label="copy"
       className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-bold transition ${
         copied
           ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-300"
@@ -40,7 +42,7 @@ export default function CopyButton({
       } ${className}`}
     >
       {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-      {copied ? "تم النسخ" : "نسخ"}
+      {copied ? t("copy.copied") : t("copy.copy")}
     </button>
   );
 }

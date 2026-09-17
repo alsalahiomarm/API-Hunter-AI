@@ -28,6 +28,8 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
+          "Tajawal",
+          "Cairo",
           "IBM Plex Sans Arabic",
           "Segoe UI",
           "Tahoma",

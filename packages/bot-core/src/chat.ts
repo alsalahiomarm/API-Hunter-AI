@@ -69,6 +69,7 @@ function buildSystemPrompt(ctx: ChatContext, web: WebResult[]): string {
 - إن لم توجد نتائج: اعتذر بصدق، لا تختلق شيئاً، واطلب إعادة الصياغة أو اقترح أقرب فكرة من قائمة الاقتراحات إن وُجدت.
 - إن كانت «مصادر الويب» تحتوي نتيجة تفيد السؤال تحديداً، يمكنك الاستشهاد بها في سطر واحد مع رابطها الحرفي، وإلا فتجاهلها.
 - استخدم نبرة مفعمة بالموارد وودودة، ووظّف التقسيم والأمثلة المريحة، حفظاً على احترام وقت القارئ.
+- أنت تملك صلاحية البحث في الإنترنت لحظياً عند الطلب. إذا طلب المستخدم بحثاً عن خدمات أو مفاتيح أو أخبار أو أدوات برمجية أو أي استفسار عام، استخدم نتائج قاعدة البيانات أولاً، وإذا كانت غير كافية أو طلب المستخدم بحثاً حياً، قم بالبحث في الإنترنت فوراً عبر أدوات البحث المتاحة واستخرج نتائج جديدة وحقيقية.
 
 «الخدمات من قاعدة البيانات»:
 ${servicesBlock}
@@ -86,7 +87,7 @@ export async function generateConversationalLead(
   ctx: ChatContext
 ): Promise<ChatLead | null> {
   const history = await getChatHistory(ctx.telegramId, 12);
-  const web = await searchWeb(ctx.query, 3).catch(() => [] as WebResult[]);
+  const web = await searchWeb(ctx.query, 5).catch(() => [] as WebResult[]);
   const system = buildSystemPrompt(ctx, web);
 
   const messages: LlmMessage[] = [

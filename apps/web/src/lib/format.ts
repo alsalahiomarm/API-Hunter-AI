@@ -1,22 +1,52 @@
 import type { ServiceRecord } from "@apihunter/db";
+import type { Language } from "@/lib/i18n";
+import { serviceText } from "@/lib/service-i18n";
 
-/** تحويل تفاصيل الخطة المجانية إلى أسطر نصية مختصرة للعرض */
-export function freeTierSummary(s: ServiceRecord): string[] {
+/** تحويل تفاصيل الخطة المجانية إلى أسطر نصية مختصرة للعرض (حسب اللغة) */
+export function freeTierSummary(s: ServiceRecord, lang: Language = "ar"): string[] {
   const lines: string[] = [];
   const f = s.freeTier;
 
-  if (f.monthlyRequests) lines.push(`~${f.monthlyRequests.toLocaleString("en")} طلب/شهر`);
-  if (f.dailyRequests) lines.push(`${f.dailyRequests.toLocaleString("en")} طلب/يوم`);
-  if (f.freeCredits) lines.push(f.freeCredits);
-  if (f.rateLimit) lines.push(`حد الاستخدام: ${f.rateLimit}`);
+  if (f.monthlyRequests) {
+    lines.push(
+      lang === "en"
+        ? `~${f.monthlyRequests.toLocaleString("en")} requests/month`
+        : `~${f.monthlyRequests.toLocaleString("en")} طلب/شهر`
+    );
+  }
+  if (f.dailyRequests) {
+    lines.push(
+      lang === "en"
+        ? `${f.dailyRequests.toLocaleString("en")} requests/day`
+        : `${f.dailyRequests.toLocaleString("en")} طلب/يوم`
+    );
+  }
 
-  if (f.requiresCard === false) lines.push("بدون بطاقة ائتمان ✅");
-  if (f.requiresCard === true) lines.push("يتطلب بطاقة ائتمان ⚠️");
+  const freeCredits = serviceText(s.slug, "freeCredits", lang, f.freeCredits);
+  if (freeCredits) lines.push(freeCredits);
+
+  const rateLimit = serviceText(s.slug, "rateLimit", lang, f.rateLimit);
+  if (rateLimit) {
+    lines.push(lang === "en" ? `Rate limit: ${rateLimit}` : `حد الاستخدام: ${rateLimit}`);
+  }
+
+  if (f.requiresCard === false) {
+    lines.push(lang === "en" ? "No credit card required ✅" : "بدون بطاقة ائتمان ✅");
+  }
+  if (f.requiresCard === true) {
+    lines.push(lang === "en" ? "Credit card required ⚠️" : "يتطلب بطاقة ائتمان ⚠️");
+  }
 
   if (f.models && f.models.length > 0) {
-    lines.push(`النماذج: ${f.models.slice(0, 3).join("، ")}`);
+    lines.push(
+      lang === "en"
+        ? `Models: ${f.models.slice(0, 3).join(", ")}`
+        : `النماذج: ${f.models.slice(0, 3).join("، ")}`
+    );
   }
-  if (f.notes) lines.push(f.notes);
+
+  const notes = serviceText(s.slug, "notes", lang, f.notes);
+  if (notes) lines.push(notes);
 
   return lines;
 }

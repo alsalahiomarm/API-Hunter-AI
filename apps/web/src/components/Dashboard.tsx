@@ -7,10 +7,12 @@ import ServiceTable from "@/components/ServiceTable";
 import ServiceCard from "@/components/ServiceCard";
 import EmptyState from "@/components/EmptyState";
 import { Radar, Clock } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type ApiResponse = { services?: ServiceRecord[]; error?: string };
 
 export default function Dashboard() {
+  const { t } = useI18n();
   const [filter, setFilter] = useState<FilterState>({
     search: "",
     category: "",
@@ -23,7 +25,7 @@ export default function Dashboard() {
   // بحث مع تأخير قصير (debounce) لتقليل الطلبات
   useEffect(() => {
     setLoading(true);
-    const t = setTimeout(async () => {
+    const t2 = setTimeout(async () => {
       try {
         const params = new URLSearchParams();
         if (filter.search) params.set("search", filter.search);
@@ -32,7 +34,7 @@ export default function Dashboard() {
 
         const res = await fetch(`/api/services?${params.toString()}`);
         const data: ApiResponse = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "خطأ غير معروف");
+        if (!res.ok) throw new Error(data.error ?? t("dashboard.unknownError"));
         setServices(data.services ?? []);
         setError("");
       } catch (e) {
@@ -41,7 +43,7 @@ export default function Dashboard() {
         setLoading(false);
       }
     }, 250);
-    return () => clearTimeout(t);
+    return () => clearTimeout(t2);
   }, [filter]);
 
   const counter = useMemo(() => services.length, [services]);
@@ -53,16 +55,15 @@ export default function Dashboard() {
         <div>
           <h2 className="flex items-center gap-2 text-2xl font-black text-white sm:text-3xl">
             <Radar className="h-7 w-7 text-primary" />
-            مخزون الخدمات المفتوحة
+            {t("dashboard.title")}
           </h2>
           <p className="mt-2 text-sm text-slate-400">
-            قائمة محدّثة تُسحب مباشرة من قاعدة بيانات الوكيل - زر أحدثها دون
-            توقف.
+            {t("dashboard.subtitle")}
           </p>
         </div>
         <span className="badge bg-white/5 text-slate-300 ring-1 ring-white/15">
           <Clock className="h-3.5 w-3.5" />
-          {counter} خدمة معروضة
+          {t("dashboard.counter")}
         </span>
       </div>
 
@@ -80,7 +81,7 @@ export default function Dashboard() {
           </div>
         ) : error ? (
           <div className="card-surface border-danger/30 p-8 text-center text-danger">
-            تعذّر جلب البيانات: {error}
+            {t("dashboard.fetchError")}: {error}
           </div>
         ) : services.length === 0 ? (
           <EmptyState />

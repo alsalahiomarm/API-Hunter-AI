@@ -1,0 +1,128 @@
+export default {
+  nav: {
+    brand: 'API <span class="text-primary">Hunter</span><span class="ml-1 text-accent">AI</span>',
+    channel: "القناة",
+    bot: "البوت",
+  },
+  hero: {
+    badge: "وكيل اصطياد يعمل يومياً على مدار الساعة",
+    title: 'اصطاد <span class="text-primary">مفاتيح API مجانية</span><br><span class="text-accent">حقيقية</span> وخطط Free Tier محدّثة',
+    description:
+      "وكيل ذكاء اصطناعي يمسح أدلة GitHub والمنتديات ومدونات المطورين يومياً، يحلّل البيانات، ويتحقق من الروابط، ثم ينشرها هنا وعلى قناة تليجرام فور اكتشافها.",
+    joinChannel: "انضم لقناة تليجرام",
+    tryBot: "جرّب البوت",
+    stats: {
+      total: "خدمة مكتشفة",
+      freeTier: "مجانية كلياً",
+      freeCredit: "برصيد مجاني",
+      providers: "مزود مختلف",
+    },
+  },
+  dashboard: {
+    title: "مخزون الخدمات المفتوحة",
+    subtitle: "قائمة محدّثة تُسحب مباشرة من قاعدة بيانات الوكيل - زر أحدثها دون توقف.",
+    counter: "خدمة معروضة",
+    loading: "جاري التحميل...",
+    unknownError: "خطأ غير معروف",
+    fetchError: "تعذّر جلب البيانات",
+  },
+  filter: {
+    search: "ابحث باسم الخدمة أو الشركة... مثال: Gemini، Tavily، Groq",
+    clearSearch: "مسح البحث",
+    category: "التصنيف:",
+    all: "الكل",
+    status: "الحالة:",
+    allStatus: "كل الحالات",
+  },
+  table: {
+    service: "الخدمة",
+    category: "التصنيف",
+    freePlan: "الخطة المجانية",
+    status: "الحالة",
+    codeExample: "مثال الكود",
+    actions: "إجراءات",
+    activateNow: "تفعيل الآن",
+    documentation: "التوثيق",
+  },
+  card: {
+    activateNow: "تفعيل الآن",
+    documentation: "التوثيق",
+  },
+  empty: {
+    title: "لا توجد نتائج مطابقة",
+    description:
+      "جرّب تغيير كلمات البحث أو إزالة الفلاتر، أو أرجع لاحقاً - الوكيل يبحث باستمرار عن خدمات جديدة.",
+  },
+  footer: {
+    ctaTitle: "لا تفوّت أي مفتاح مجاني جديد",
+    ctaDescription:
+      "الوكيل ينشر الاكتشافات الجديدة على القناة لحظياً، والبوت يجيب عن استفساراتك في المحادثة الخاصة.",
+    channel: "القناة",
+    bot: "البوت",
+    brand: "API Hunter AI",
+    disclaimer: "أداة توعوية - تحقق دائماً من شروط الخدمة وأسعار المزودين",
+  },
+  copy: {
+    copy: "نسخ",
+    copied: "تم النسخ",
+  },
+  code: {
+    python: "Python",
+    javascript: "JavaScript",
+    bash: "Bash (cURL)",
+    text: "Tech",
+    noCode: "# لا يوجد مثال كود حالياً",
+  },
+  searchResults: {
+    title: "نتائج البحث عن:",
+    latest: "أحدث ما اصطاده الصيّاد",
+    noResults: '😔 لم أجد نتائج مطابقة لـ "',
+    tryAnother:
+      "جرّب صياغة أخرى، مثال: «مفتاح بحث في الإنترنت» أو «نموذج ذكاء اصطناعي» أو «قاعدة بيانات»",
+    clickButton: "اضغط زراً للانتقال مباشرة، أو اكتب طلباً آخر بصيغة مختلفة.",
+  },
+  greeting: {
+    title: "أهلاً بك!",
+    subtitle: "أنا صيّاد مفاتيح الـ API المجانية 🪤",
+    instructions: "اكتب لي ما تحتاجه بالعربية أو الإنجليزية مثل:",
+    examples:
+      "«مفتاح بحث في الإنترنت» · «نموذج ذكاء اصطناعي» · «توليد صور» · «قاعدة بيانات»",
+    selectCategory: "أو اختر تصنيفاً من الأزرار 👇",
+  },
+  help: {
+    title: "🪤 صيّاد المفاتيح - الأوامر المتاحة:",
+    start: "▪️ /start - رسالة البداية",
+    latest: "▪️ /latest - آخر 3 خدمات مكتشفة",
+    search: "▪️ /search <كلمة> - بحث مباشر",
+    categories: "▪️ /categories - تصفح حسب التصنيف",
+    naturalLanguage: "أو فقط اكتب طلبك بلغتك الطبيعية، مثال:",
+    example1: "«أريد مفتاح API مجاني للبحث في شبكة الإنترنت»",
+    example2: "«أعطني أفضل مفتاح لنموذج Gemini»",
+  },
+  blockedNote: {
+    title:
+      "💡 بعض خدمات البحث محجوبة في بعض البلدان — هذه بدائل تعمل من خوادمها:",
+    ddg: "• DuckDuckGo Instant Answer — بدون مفتاح إطلاقاً",
+    googleCSE: "• Google Programmable Search — 100 استعلام/يوم",
+    firecrawl: "• Firecrawl Search — بحث وزحف من خوادمهم",
+    wikimedia: "• Wikimedia · Openverse · Internet Archive — بيانات ووسائط بدون مفتاح",
+  },
+  dataModeNote:
+    "⚠️ <i>قاعدة البيانات قيد الربط حالياً — هذه نتائج من البيانات التجريبية.</i>",
+  categories: {
+    AI_MODELS: "نماذج ذكاء اصطناعي",
+    SEARCH_TOOLS: "أدوات البحث",
+    AUDIO_IMAGE: "صوت وصورة",
+    DATABASES: "قواعد بيانات",
+    DEV_TOOLS: "أدوات تطوير",
+    OTHER: "أخرى",
+  },
+  status: {
+    FREE_TIER: "مجاني بالكامل",
+    FREE_CREDIT: "رصيد مجاني",
+    TRIAL: "تجربة مؤقتة",
+    PENDING: "قيد التحقق",
+    VERIFIED: "موثّد",
+    FAILED: "فشل التحقق",
+  },
+} as const;
