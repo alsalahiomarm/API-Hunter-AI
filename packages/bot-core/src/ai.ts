@@ -15,7 +15,11 @@ export const SYSTEM_INSTRUCTIONS = `أنت مساعد ذكي، تفاعلي، و
 إذا لم تكن متأكداً من معلومة أو لم تتوفر لديك في سياق المحادثة، أقر بعدم معرفتك فوراً أو اطلب توضيحاً، ولا تقم بالتخمين.
 حافظ على النبرة المساعدة والإيجابية دائماً.
 
-مهم: أنت تملك صلاحية البحث في الإنترنت لحظياً عند الطلب. إذا طلب المستخدم بحثاً عن خدمات أو مفاتيح أو أخبار أو أدوات برمجية أو أي استفسار عام، استخدم نتائج قاعدة البيانات أولاً، وإذا كانت غير كافية أو طلب المستخدم بحثاً حياً، قم بالبحث في الإنترنت فوراً عبر أدوات البحث المتاحة (DuckDuckGo، Serper، Firecrawl) واستخرج نتائج جديدة وحقيقية، ثم احفظها في قاعدة البيانات وأعددها للمستخدم. لا تتردد في البحث في الإنترنت لأي استفسار يطلبه المستخدم - أنت تملك هذه الصلاحية بالكامل.`;
+⚠️ **قاعدة ذهبية — البحث في الإنترنت:**
+محرك البحث الحي يعمل في كواليس النظام. نتائجه الحقيقية (بعد فحص أمني وصحة الروابط) تُمرَّر إليك داخل تعليمات النظام لكل طلب.
+**ممنوع قطعياً** قول: "لا أستطيع البحث في الإنترنت"، "لا أملك صلاحية التصفح"، "لا يمكنني الوصول للويب"، "أدوات البحث غير متاحة"، أو أي تنويع لهذه العبارات.
+البحث **نُفِّذَ فعلاً** — كل ما عليك هو قراءة النتائج المرفقة في التعليمات وذكرها بدقة مع روابطها الحرفية.
+إن كانت النتائج المرفقة غير موفّقة للسؤال، اذكر ما هو متاح منها بصدق واقترح صياغة طلب أوضح.`;
 
 export type LlmRole = "system" | "user" | "assistant";
 export interface LlmMessage {
@@ -190,8 +194,7 @@ interface InvokeOutcome {
 }
 
 async function invokeGemini(key: string, params: LlmParams, system: string, cfg: TaskConfig): Promise<InvokeOutcome> {
-  const wanted = env("GEMINI_MODEL") || "gemini-2.0-flash";
-  const models = [wanted, "gemini-2.0-flash", "gemini-1.5-flash"].filter((m, i, a) => a.indexOf(m) === i);
+  const models = modelChain("gemini");
 
   const contents = params.messages
     .filter((m) => m.role !== "system")
@@ -206,36 +209,49 @@ async function invokeGemini(key: string, params: LlmParams, system: string, cfg:
   const tryModels = async (candidateModels: string[]): Promise<InvokeOutcome> => {
     let lastErr: { status: number; data: any } | null = null;
     for (const model of candidateModels) {
-      const body: Record<string, unknown> = {
-        systemInstruction: { parts: [{ text: system }] },
-        contents,
-        generationConfig: {
-          temperature: cfg.temperature,
-          topP: cfg.topP,
-          topK: cfg.topK,
-          maxOutputTokens: cfg.maxOutputTokens,
-        },
-      };
-      if (params.grounding) body.tools = [{ googleSearch: {} }];
+      // محاولة مع Grounding إن طُلب، ثم بدونها إن رفض النموذج الأدوات (400)
+      const groundingAttempts: boolean[] = params.grounding ? [true, false] : [false];
+      for (const useGrounding of groundingAttempts) {
+        const body: Record<string, unknown> = {
+          systemInstruction: { parts: [{ text: system }] },
+          contents,
+          generationConfig: {
+            temperature: cfg.temperature,
+            topP: cfg.topP,
+            topK: cfg.topK,
+            maxOutputTokens: cfg.maxOutputTokens,
+          },
+        };
+        if (useGrounding) body.tools = [{ googleSearch: {} }];
 
-      const res = await postJson(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
-        null,
-        body,
-        cfg.timeoutMs
-      );
+        const res = await postJson(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
+          null,
+          body,
+          cfg.timeoutMs
+        );
 
-      if (res.status === 200 && res.data) {
-        const text =
-          res.data.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("") ?? "";
-        const chunks: any[] = res.data.groundingMetadata?.groundingChunks ?? [];
-        const groundingSources = chunks
-          .map((c) => ({ title: String(c?.web?.title ?? ""), url: String(c?.web?.uri ?? "") }))
-          .filter((s) => s.url);
-        return { text: text.trim(), model, groundingSources };
+        if (res.status === 200 && res.data) {
+          const text =
+            res.data.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("") ?? "";
+          const chunks: any[] = res.data.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+          const groundingSources = chunks
+            .map((c) => ({ title: String(c?.web?.title ?? ""), url: String(c?.web?.uri ?? "") }))
+            .filter((s) => s.url);
+          if (text.trim()) return { text: text.trim(), model, groundingSources };
+          // استجابة بلا نص (حجب/قطع) -> نجرّب الإعداد أو النموذج التالي
+          lastErr = { status: 200, data: res.data };
+          continue;
+        }
+
+        lastErr = { status: res.status, data: res.data };
+
+        // اسم نموذج متقادم أو إعداد غير مقبول -> البديل التالي في السلسلة
+        if (isModelMissing(res.status)) continue;
+
+        // حصة/معدل/عطل خادم -> مشكلة على مستوى المفتاح: تبديل الاسم لا يفيد
+        throw { status: res.status, message: errorMessage(res.data) };
       }
-      lastErr = { status: res.status, data: res.data };
-      if (res.status !== 404) throw { status: res.status, message: errorMessage(res.data) };
     }
     throw { status: lastErr?.status ?? 0, message: errorMessage(lastErr?.data) };
   };
@@ -268,32 +284,51 @@ async function invokeGemini(key: string, params: LlmParams, system: string, cfg:
 async function invokeOpenAiCompatible(
   provider: string,
   baseUrl: string,
-  model: string,
-  key: string,
   params: LlmParams,
   system: string,
-  cfg: TaskConfig
+  cfg: TaskConfig,
+  key: string
 ): Promise<InvokeOutcome> {
-  const body: Record<string, unknown> = {
-    model,
-    temperature: cfg.temperature,
-    max_tokens: cfg.maxOutputTokens,
-    messages: [{ role: "system", content: system }, ...params.messages.filter((m) => m.role !== "system")],
-  };
-  if (cfg.topP) body.top_p = cfg.topP;
+  const models = modelChain(provider);
+  let lastErr: { status: number; message: string } | null = null;
 
-  const res = await postJson(baseUrl, key, body, cfg.timeoutMs);
-  if (res.status === 200 && res.data) {
-    const choice = res.data.choices?.[0];
-    const content = choice?.message?.content;
-    const text = typeof content === "string" ? content : Array.isArray(content) ? content.map((c: any) => c?.text ?? "").join("") : "";
-    if (text) return { text: text.trim(), model };
+  for (const model of models) {
+    const body: Record<string, unknown> = {
+      model,
+      temperature: cfg.temperature,
+      max_tokens: cfg.maxOutputTokens,
+      messages: [{ role: "system", content: system }, ...params.messages.filter((m) => m.role !== "system")],
+    };
+    if (cfg.topP) body.top_p = cfg.topP;
+
+    const res = await postJson(baseUrl, key, body, cfg.timeoutMs);
+    if (res.status === 200 && res.data) {
+      const choice = res.data.choices?.[0];
+      const content = choice?.message?.content;
+      const text =
+        typeof content === "string"
+          ? content
+          : Array.isArray(content)
+            ? content.map((c: any) => c?.text ?? "").join("")
+            : "";
+      if (text.trim()) return { text: text.trim(), model };
+      // 200 بلا نص (مزوّد وسيط/قطع) -> نجرّب النموذج التالي
+      lastErr = { status: 200, message: "استجابة فارغة من المزوّد" };
+      continue;
+    }
+
+    lastErr = { status: res.status, message: errorMessage(res.data) };
+
+    // اسم نموذج متقادم/غير متاح لهذا الحساب -> البديل التالي
+    if (isModelMissing(res.status)) continue;
+
+    throw { status: res.status, message: lastErr.message };
   }
-  throw { status: res.status, message: errorMessage(res.data) };
+
+  throw { status: lastErr?.status ?? 0, message: lastErr?.message ?? "فشل كل النماذج" };
 }
 
 async function invokeCohere(key: string, params: LlmParams, system: string, cfg: TaskConfig): Promise<InvokeOutcome> {
-  const model = env("COHERE_MODEL") || "command-a-plus-05-2026";
   const history = params.messages
     .filter((m) => m.role !== "system")
     .map((m) => ({
@@ -301,21 +336,29 @@ async function invokeCohere(key: string, params: LlmParams, system: string, cfg:
       message: m.content,
     }));
   const last = history.pop() ?? { role: "USER" as const, message: "" };
-  const body: Record<string, unknown> = {
-    model,
-    message: last.message,
-    chat_history: history,
-    preamble: system,
-    temperature: cfg.temperature,
-    p: cfg.topP,
-    k: cfg.topK,
-    max_tokens: cfg.maxOutputTokens,
-  };
-  const res = await postJson("https://api.cohere.com/v1/chat", key, body, cfg.timeoutMs);
-  if (res.status === 200 && res.data?.text) {
-    return { text: String(res.data.text).trim(), model };
+
+  let lastErr: { status: number; message: string } | null = null;
+  for (const model of modelChain("cohere")) {
+    const body: Record<string, unknown> = {
+      model,
+      message: last.message,
+      chat_history: history,
+      preamble: system,
+      temperature: cfg.temperature,
+      p: cfg.topP,
+      k: cfg.topK,
+      max_tokens: cfg.maxOutputTokens,
+    };
+    const res = await postJson("https://api.cohere.com/v1/chat", key, body, cfg.timeoutMs);
+    if (res.status === 200 && res.data?.text) {
+      const text = String(res.data.text).trim();
+      if (text) return { text, model };
+    }
+    lastErr = { status: res.status, message: errorMessage(res.data) };
+    if (isModelMissing(res.status)) continue;
+    throw { status: res.status, message: lastErr.message };
   }
-  throw { status: res.status, message: errorMessage(res.data) };
+  throw { status: lastErr?.status ?? 0, message: lastErr?.message ?? "فشل كل النماذج" };
 }
 
 interface TaskConfig {
@@ -327,6 +370,36 @@ interface TaskConfig {
 }
 
 // ---------------------------------------------------------------
+// سلاسل النماذج: أسماء النماذج تتقادم بسرعة (404 model_not_found)،
+// لذا نجرّب سلسلة بدائل لكل مزوّد بدل الاعتماد على اسم واحد.
+// ---------------------------------------------------------------
+const MODEL_CHAIN: Record<string, string[]> = {
+  gemini: [env("GEMINI_MODEL"), "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash"],
+  openrouter: [env("OPENROUTER_MODEL"), "openrouter/auto"],
+  groq: [env("GROQ_MODEL"), "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3-32b"],
+  deepseek: [env("DEEPSEEK_MODEL"), "deepseek-chat"],
+  mistral: [env("MISTRAL_MODEL"), "open-mistral-nemo", "mistral-tiny", "mistral-small-latest"],
+  cohere: [env("COHERE_MODEL"), "command-a-03-2025", "command-r-08-2024", "command-r-plus-08-2024"],
+  openai: [env("OPENAI_MODEL"), "gpt-4o-mini"],
+};
+
+/** سلسلة النماذج لمزوّد (بلا تكرار، والأسماء الفارغة مستبعدة). */
+function modelChain(provider: string): string[] {
+  const chain = MODEL_CHAIN[provider] ?? [];
+  return chain.filter((m, i, a) => Boolean(m) && a.indexOf(m) === i);
+}
+
+/** اسم موديل Gemini الافتراضي (يُستخدم في الرسائل الإرشادية) */
+export function defaultModelFor(provider: string): string {
+  return modelChain(provider)[0] ?? "auto";
+}
+
+/** خطأ نموذج غير متاح (404) — يستحق تجربة الاسم التالي في السلسلة */
+function isModelMissing(status: number): boolean {
+  return status === 404 || status === 400;
+}
+
+// ---------------------------------------------------------------
 // تدوير المفاتيح (Round-Robin) — عدّاد ذري لكل مزوّد
 // ---------------------------------------------------------------
 const keyIndex = new Map<string, number>();
@@ -335,6 +408,26 @@ function rotate(provider: string, keys: string[]): string {
   const i = keyIndex.get(provider) ?? 0;
   keyIndex.set(provider, i + 1 >= keys.length ? 0 : i + 1);
   return keys[i];
+}
+
+// ---------------------------------------------------------------
+// تبريد المزوّدين المعطوبين مؤقتاً
+// سبب: حصة منتهية (429) أو رصيد صفر (402) أو مفتاح مرفوض (401/403).
+// بدون هذا التبريد يخسر كل طلب ثوانيَ ثمينة في تجربة مزوّدين ميتين.
+// ---------------------------------------------------------------
+const cooldownUntil = new Map<string, number>();
+const COOLDOWN_MS = 5 * 60 * 1000;
+
+function isCooling(provider: string): boolean {
+  return Date.now() < (cooldownUntil.get(provider) ?? 0);
+}
+
+function markCooldown(provider: string, status: number): void {
+  if (status === 429 || status === 402 || status === 401 || status === 403) {
+    cooldownUntil.set(provider, Date.now() + COOLDOWN_MS);
+  } else if (status === 200 || status === 0) {
+    cooldownUntil.delete(provider);
+  }
 }
 
 function resolveCfg(params: LlmParams, task: LlmTask): TaskConfig {
@@ -363,17 +456,17 @@ async function invokeProvider(
     case "gemini":
       return invokeGemini(key, params, system, cfg);
     case "openrouter":
-      return invokeOpenAiCompatible("openrouter", "https://openrouter.ai/api/v1/chat/completions", env("OPENROUTER_MODEL") || "openrouter/auto", key, params, system, cfg);
+      return invokeOpenAiCompatible("openrouter", "https://openrouter.ai/api/v1/chat/completions", params, system, cfg, key);
     case "groq":
-      return invokeOpenAiCompatible("groq", "https://api.groq.com/openai/v1/chat/completions", env("GROQ_MODEL") || "qwen/qwen3.8-27b", key, params, system, cfg);
+      return invokeOpenAiCompatible("groq", "https://api.groq.com/openai/v1/chat/completions", params, system, cfg, key);
     case "deepseek":
-      return invokeOpenAiCompatible("deepseek", "https://api.deepseek.com/chat/completions", env("DEEPSEEK_MODEL") || "deepseek-chat", key, params, system, cfg);
+      return invokeOpenAiCompatible("deepseek", "https://api.deepseek.com/chat/completions", params, system, cfg, key);
     case "mistral":
-      return invokeOpenAiCompatible("mistral", "https://api.mistral.ai/v1/chat/completions", env("MISTRAL_MODEL") || "mistral-small-latest", key, params, system, cfg);
+      return invokeOpenAiCompatible("mistral", "https://api.mistral.ai/v1/chat/completions", params, system, cfg, key);
     case "cohere":
       return invokeCohere(key, params, system, cfg);
     case "openai":
-      return invokeOpenAiCompatible("openai", "https://api.openai.com/v1/chat/completions", env("OPENAI_MODEL") || "gpt-4o-mini", key, params, system, cfg);
+      return invokeOpenAiCompatible("openai", "https://api.openai.com/v1/chat/completions", params, system, cfg, key);
     default:
       throw { status: 0, message: `مزوّد غير معروف: ${provider}` };
   }
@@ -384,7 +477,8 @@ async function invokeProvider(
 // ---------------------------------------------------------------
 export async function callLlm(params: LlmParams): Promise<LlmResult> {
   const task = params.task ?? "chat";
-  const order = ROUTER[task];
+  // المزوّدون غير المبرَّدين أولاً: نتجنب حرق الوقت في مزوّد استُهلكت حصته للتوّ
+  const order = [...ROUTER[task]].sort((a, b) => Number(isCooling(a)) - Number(isCooling(b)));
   const system = params.system ?? SYSTEM_INSTRUCTIONS;
   const cfg = resolveCfg(params, task);
   const errors: LlmErrorInfo[] = [];
@@ -392,19 +486,24 @@ export async function callLlm(params: LlmParams): Promise<LlmResult> {
   for (const provider of order) {
     const keys = PROVIDER_KEYS[provider]();
     if (!keys.length) continue;
+    let lastStatus = 0;
     for (let attempt = 0; attempt < keys.length; attempt++) {
       const key = rotate(provider, keys);
       try {
         const out = await invokeProvider(provider, key, params, system, cfg);
         if (out.text) {
+          markCooldown(provider, 200); // مزوّد سليم: أزل أي تبريد سابق
           return { text: out.text, provider, model: out.model, groundingSources: out.groundingSources };
         }
         errors.push({ provider, status: 0, message: "استجابة فارغة من المزوّد" });
       } catch (err) {
         const e = err as { status?: number; message?: string };
-        errors.push({ provider, status: e.status ?? 0, message: e.message ?? String(err) });
+        lastStatus = e.status ?? 0;
+        errors.push({ provider, status: lastStatus, message: e.message ?? String(err) });
       }
     }
+    // فشلت كل مفاتيح هذا المزوّد بحصة/رصيد/صلاحية -> برّده كي لا نعيد المحاولة فوراً
+    markCooldown(provider, lastStatus);
   }
 
   throw new LlmAllFailedError(errors);

@@ -179,19 +179,8 @@ async function mergeWithWebSearch(
     (s) => !isExcluded(s.name)
   );
 
-  // تكفي قاعدة البيانات وحدها — إلا إذا طلب المستخدم بحثاً حياً أو استُهلكت النتائج السابقة
-  if (!opts.forceLive && relevant.length >= requestedCount) {
-    return {
-      services: relevant.slice(0, requestedCount),
-      webResults: [],
-      usedWeb: false,
-      dbCount: relevant.length,
-      blocked: 0,
-      lowQuality: 0,
-    };
-  }
-
-  // 2) البحث الحي في الإنترنت (مع تدوير النتائج كي لا تتكرر الإجابة)
+  // 2) البحث الحي في الإنترنت — **دائماً إجباري** لكل طلب (Function Calling إلزامي)
+  // لا نكتفي بقاعدة البيانات أبداً، حتى لو كانت نتائجها كافية، لضمان أحدث البيانات
   const webResults = await webSearch(query, requestedCount, { offset: webOffset });
 
   const seenLinks = new Set(dbServices.map((s) => s.activationLink));
@@ -328,15 +317,13 @@ export interface SearchOutcome {
 export async function performSmartSearch(
   rawQuery: string,
   telegramId = "?",
-  opts: { forceLive?: boolean; excludeDb?: boolean } = {}
+  opts: { excludeDb?: boolean } = {}
 ): Promise<SearchOutcome> {
   const q = rawQuery.trim();
   const nlu = classifyQuery(q);
   const requestedCount = extractCount(q);
-  const wantsLive =
-    opts.forceLive ||
-    wantsLiveSearch(q) ||
-    (!nlu.category && isGeneralQuery(q));
+  // البحث الحي إجباري دائماً — لا توجد حالة نكتفي فيها بقاعدة البيانات فقط
+  const wantsLive = true;
 
   const dbServices = await fetchServices({ category: nlu.category });
 
@@ -356,60 +343,52 @@ export async function performSmartSearch(
   let rotated = false;
   let fallbackNote = "";
 
-  if (wantsLive || askedForMore || dbServices.length === 0 || (nlu.intent === "search" && !nlu.category)) {
-    const merged = await mergeWithWebSearch(q, dbServices, requestedCount, {
-      forceLive: wantsLive,
+  // البحث الحي يُنفَّذ إلزاماً لكل طلب
+  const merged = await mergeWithWebSearch(q, dbServices, requestedCount, {
+    forceLive: true,
+    category: nlu.category,
+    excludeNames: recentlyShown,
+  });
+  services = merged.services;
+  webResults = merged.webResults;
+  usedWeb = merged.usedWeb;
+  blocked = merged.blocked;
+  lowQuality = merged.lowQuality;
+
+  // تدوير النتائج (الركيزة الثالثة): استُهلكت نتائج الاستعلام نفسه -> نتقدّم في مجموعة
+  // البحث لنقدّم خيارات جديدة تماماً بدل الرد الفارغ.
+  if (services.length < requestedCount) {
+    const second = await mergeWithWebSearch(q, dbServices, requestedCount, {
+      forceLive: true,
       category: nlu.category,
-      excludeNames: recentlyShown,
+      excludeNames: [...recentlyShown, ...services.map((s) => s.name)],
+      webOffset: requestedCount,
+    }).catch((e) => {
+      console.warn("[bot] تعذّر تدوير نتائج البحث:", (e as Error).message);
+      return null;
     });
-    services = merged.services;
-    webResults = merged.webResults;
-    usedWeb = merged.usedWeb;
-    blocked = merged.blocked;
-    lowQuality = merged.lowQuality;
-
-    // تدوير النتائج (الركيزة الثالثة): استُهلكت نتائج الاستعلام نفسه -> نتقدّم في مجموعة
-    // البحث لنقدّم خيارات جديدة تماماً بدل الرد الفارغ.
-    if (services.length < requestedCount) {
-      const second = await mergeWithWebSearch(q, dbServices, requestedCount, {
-        forceLive: true,
-        category: nlu.category,
-        excludeNames: [...recentlyShown, ...services.map((s) => s.name)],
-        webOffset: requestedCount,
-      }).catch((e) => {
-        console.warn("[bot] تعذّر تدوير نتائج البحث:", (e as Error).message);
-        return null;
-      });
-      if (second) {
-        rotated = true;
-        if (second.services.length > services.length) {
-          services = second.services;
-          usedWeb = usedWeb || second.usedWeb;
-        }
-        webResults = [...webResults, ...second.webResults];
-        blocked += second.blocked;
-        lowQuality += second.lowQuality;
+    if (second) {
+      rotated = true;
+      if (second.services.length > services.length) {
+        services = second.services;
+        usedWeb = usedWeb || second.usedWeb;
       }
+      webResults = [...webResults, ...second.webResults];
+      blocked += second.blocked;
+      lowQuality += second.lowQuality;
     }
+  }
 
-    // لا طريق مسدود أبداً: إن لم يتبقَّ جديد بعد التدوير، نُعيد أفضل ما لدينا
-    // (مطابق فعلاً) مع توضيح أننا أدرنا القائمة كاملة — أوضح من رد فارغ.
-    if (!services.length && recentlyShown.length) {
-      const cycle = rankServices(dbServices, nlu, requestedCount);
-      const restored = (cycle.length ? cycle : dbServices).slice(0, requestedCount);
-      if (restored.length) {
-        services = restored;
-        fallbackNote =
-          "🔄 <i>أدرنا قائمة النتائج كاملةً في هذه الجلسة — هذه هي الخيارات الأقوى مجدداً. اطلب مجالاً أضيق أو صيغة مختلفة للحصول على مجموعة جديدة.</i>";
-      }
+  // لا طريق مسدود أبداً: إن لم يتبقَّ جديد بعد التدوير، نُعيد أفضل ما لدينا
+  // (مطابق فعلاً) مع توضيح أننا أدرنا القائمة كاملة — أوضح من رد فارغ.
+  if (!services.length && recentlyShown.length) {
+    const cycle = rankServices(dbServices, nlu, requestedCount);
+    const restored = (cycle.length ? cycle : dbServices).slice(0, requestedCount);
+    if (restored.length) {
+      services = restored;
+      fallbackNote =
+        "🔄 <i>أدرنا قائمة النتائج كاملةً في هذه الجلسة — هذه هي الخيارات الأقوى مجدداً. اطلب مجالاً أضيق أو صيغة مختلفة للحصول على مجموعة جديدة.</i>";
     }
-  } else {
-    const ranked = rankServices(dbServices, nlu, requestedCount);
-    services = ranked.length
-      ? ranked.slice(0, requestedCount)
-      : nlu.category || !nlu.query
-        ? dbServices.slice(0, requestedCount)
-        : [];
   }
 
   // استبعاد خدمات قاعدة البيانات إن طُلب صراحةً (الردود العامة لا تُلحق بها)
@@ -455,11 +434,11 @@ async function runSmartSearch(ctx: Context, rawQuery: string) {
     return;
   }
 
-  // 2) تنفيذ البحث (قاعدة بيانات + بحث حي + فحص أمني + تنويع)
+  // 2) تنفيذ البحث (قاعدة بيانات + بحث حي إجباري + فحص أمني + تنويع)
+  // البحث الحي الآن إجباري لكل الاستفسارات — لا استثناءات
   const isApiRequest = isApiToolRequest(q);
   const outcome = await performSmartSearch(q, telegramId, {
-    forceLive: isApiRequest,
-    excludeDb: !isApiRequest,
+    excludeDb: !isApiRequest, // استبعاد DB للردود العامة فقط
   });
   const { requestedCount, usedWeb, blocked, lowQuality, webResults, fallbackNote } = outcome;
   const finalServices = outcome.services;
