@@ -1,7 +1,7 @@
 import type { Context, Telegraf } from "telegraf";
-import type { ServiceRecord } from "@apihunter/db";
-import { clearChatHistory, fetchLatest, fetchServices, logUserQuery, isDatabaseReachableCached, saveChatMessage, saveDiscoveredService } from "./db";
-import { classifyQuery, rankServices } from "./nlu";
+import type { Category, ServiceRecord } from "@apihunter/db";
+import { clearChatHistory, fetchLatest, fetchServices, fetchRecentMatches, forgetShown, logUserQuery, isDatabaseReachableCached, rememberShown, saveChatMessage, saveDiscoveredService } from "./db";
+import { classifyQuery, rankServices, isApiToolRequest } from "./nlu";
 import {
   blockedNote,
   categoriesKeyboard,
@@ -14,10 +14,15 @@ import {
   formatSearchResultsReply,
   formatServiceFull,
   formatServicesBody,
+  formatWebSourcesReply,
+  formatWebSourcesSection,
   searchKeyboard,
 } from "./formatter";
+import type { WebSourceLink } from "./formatter";
 import { generateConversationalLead } from "./chat";
-import { searchWeb as webSearch, type WebResult } from "@apihunter/bot-core";
+import { auditSnippet, isLinkHealthy } from "./security";
+import { looksLikeApiService } from "./quality";
+import { searchWeb as webSearch, type WebResult } from "./web";
 
 const HELP_MSG = [
   "<b>🪤 صيّاد المفاتيح - الأوامر المتاحة:</b>",
@@ -69,10 +74,12 @@ export function registerCommands(bot: Telegraf) {
 
   bot.help(async (ctx) => ctx.replyWithHTML(HELP_MSG));
 
-  // مسح ذاكرة المحادثة لهذا المستخدم
+  // مسح ذاكرة المحادثة + ذاكرة العرض (تنويع النتائج) لهذا المستخدم
   bot.command("reset", async (ctx) => {
-    clearChatHistory(String(ctx.from?.id ?? "")).catch(() => {});
-    await ctx.reply("🧹 مسحت ذاكرة المحادثة الحالية. من أين نبدأ؟ 👋");
+    const id = String(ctx.from?.id ?? "");
+    clearChatHistory(id).catch(() => {});
+    forgetShown(id);
+    await ctx.reply("🧹 مسحت ذاكرة المحادثة الحالية وسجل النتائج المعروضة. من أين نبدأ؟");
   });
 
   bot.command("latest", async (ctx) => {
@@ -144,37 +151,102 @@ function buildConversationalBlock(
   return live ? text : `${text}\n\n${dataModeNote(live)}`;
 }
 
-/** دمج نتائج البحث في الإنترنت مع قاعدة البيانات */
+/**
+ * دمج نتائج البحث في الإنترنت مع قاعدة البيانات.
+ * - نتائج قاعدة البيانات تُستخدم فقط إذا كانت مطابقة فعلاً (لا نتائج عشوائية).
+ * - البحث الحي يُنفَّذ إلزاماً إذا طلبه المستخدم صراحةً، ويُستبعد ما عُرض سابقاً.
+ * - لا تُخزَّن أي نتيجة ويب إلا بعد: تدقيق أمني + فحص فعلي لسلامة الرابط.
+ */
 async function mergeWithWebSearch(
   query: string,
   dbServices: ServiceRecord[],
-  requestedCount: number
-): Promise<{ services: ServiceRecord[]; webResults: WebResult[]; usedWeb: boolean }> {
-  // جلب نتائج قاعدة البيانات أولاً
-  const dbRanked = rankServices(dbServices, classifyQuery(query));
-  const dbList = dbRanked.length ? dbRanked : dbServices.slice(0, requestedCount);
+  requestedCount: number,
+  opts: { forceLive: boolean; category?: Category; excludeNames: string[]; webOffset?: number }
+): Promise<{
+  services: ServiceRecord[];
+  webResults: WebResult[];
+  usedWeb: boolean;
+  dbCount: number;
+  blocked: number;
+  lowQuality: number;
+}> {
+  const nlu = classifyQuery(query);
+  const isExcluded = (name: string) => opts.excludeNames.includes(name);
+  const webOffset = Math.max(0, opts.webOffset ?? 0);
 
-  // إذا كانت نتائج قاعدة البيانات كافية، نستخدمها فقط
-  if (dbList.length >= requestedCount) {
-    return { services: dbList.slice(0, requestedCount), webResults: [], usedWeb: false };
+  // 1) المطابق فعلاً من قاعدة البيانات (rankServices يستبعد غير المطابق بالمرة)
+  const relevant = rankServices(dbServices, nlu, requestedCount + webOffset).filter(
+    (s) => !isExcluded(s.name)
+  );
+
+  // تكفي قاعدة البيانات وحدها — إلا إذا طلب المستخدم بحثاً حياً أو استُهلكت النتائج السابقة
+  if (!opts.forceLive && relevant.length >= requestedCount) {
+    return {
+      services: relevant.slice(0, requestedCount),
+      webResults: [],
+      usedWeb: false,
+      dbCount: relevant.length,
+      blocked: 0,
+      lowQuality: 0,
+    };
   }
 
-  // البحث في الإنترنت لتكملة النتائج
-  const webResults = await webSearch(query, requestedCount);
+  // 2) البحث الحي في الإنترنت (مع تدوير النتائج كي لا تتكرر الإجابة)
+  const webResults = await webSearch(query, requestedCount, { offset: webOffset });
 
-  if (webResults.length === 0) {
-    return { services: dbList.slice(0, requestedCount), webResults: [], usedWeb: false };
-  }
+  const seenLinks = new Set(dbServices.map((s) => s.activationLink));
+  const seenNames = new Set(dbServices.map((s) => s.name.trim().toLowerCase()));
+  let blocked = 0;
+  let lowQuality = 0;
 
-  // تحويل نتائج الويب إلى ServiceRecord وحفظها في قاعدة البيانات
+  // المرحلة 1: ترشيح سريع (بوّابة جودة + تدقيق أمني + إزالة تكرار) — بلا انتظار شبكة
+  const screened = webResults
+    .filter((w) => {
+      if (!w.url || seenLinks.has(w.url)) return false;
+      if (w.title && isExcluded(w.title)) return false;
+      // بوّابة الجودة: مقالات/فيديوهات/منشورات منصات المحتوى ليست بطاقات خدمة API
+      if (!looksLikeApiService(w)) {
+        console.warn(`[جودة] ليست خدمة API — رُفضت: ${w.url}`);
+        lowQuality++;
+        return false;
+      }
+      // التدقيق الأمني السيبراني (رابط خبيث/منتحل/يسرّب مفاتيح)
+      const audit = auditSnippet({ url: w.url, text: w.snippet });
+      if (!audit.safe) {
+        console.warn(
+          `[أمان] رُفض رابط (خطورة ${audit.score}): ${w.url} — ${audit.findings.map((f) => f.code).join(", ")}`
+        );
+        blocked++;
+        return false;
+      }
+      const name = (w.title || w.url).trim().slice(0, 90);
+      if (!name || seenNames.has(name.toLowerCase())) return false;
+      seenLinks.add(w.url);
+      seenNames.add(name.toLowerCase());
+      return true;
+    })
+    .slice(0, requestedCount);
+
+  // المرحلة 2: التحقق البرمجي الفعلي — على التوازي وبمهلة قصيرة كي لا يتجاوز الرد حد الوظيفة السحابية
+  const healthy = await Promise.all(
+    screened.map((w) => isLinkHealthy(w.url, 5000).catch(() => false))
+  );
+
   const webServices: ServiceRecord[] = [];
-  for (const w of webResults) {
+  for (let i = 0; i < screened.length; i++) {
+    if (!healthy[i]) {
+      console.warn(`[تحقق] رابط لا يستجيب — رُفض: ${screened[i].url}`);
+      blocked++;
+      continue;
+    }
+    const w = screened[i];
+    const name = (w.title || w.url).trim().slice(0, 90);
     const saved = await saveDiscoveredService({
-      name: w.title,
-      slug: `web-${w.url.replace(/[^a-z0-9]/gi, "-").slice(0, 40)}`,
+      name,
+      slug: `web-${slugifyUrl(w.url)}`,
       provider: w.source.charAt(0).toUpperCase() + w.source.slice(1),
-      category: "OTHER" as const,
-      description: w.snippet || w.title,
+      category: opts.category ?? "OTHER",
+      description: (w.snippet || w.title || "").slice(0, 300),
       freeTier: {},
       activationLink: w.url,
       documentationLink: w.url,
@@ -184,8 +256,180 @@ async function mergeWithWebSearch(
     if (saved) webServices.push(saved);
   }
 
-  const combined = [...dbList, ...webServices].slice(0, requestedCount);
-  return { services: combined, webResults, usedWeb: true };
+  const combined = [...relevant, ...webServices].slice(0, requestedCount);
+  return {
+    services: combined,
+    webResults,
+    usedWeb: webServices.length > 0,
+    dbCount: relevant.length,
+    blocked,
+    lowQuality,
+  };
+}
+
+/** تحويل رابط إلى شريحة slug صالحة للتخزين */
+function slugifyUrl(url: string): string {
+  return url
+    .replace(/^https?:\/\//i, "")
+    .replace(/[^a-z0-9]/gi, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 40);
+}
+
+/**
+ * تجميع "مصادر ويب" حقيقية للعرض (مقالات/أخبار/توثيق) — لا تُخزَّن كخدمات.
+ * تُستعمل في الاستفسارات العامة (أخبار/معلومات) كي لا يُجاب المستخدم بـ"لا نتائج"
+ * رغم أن البحث الحي أعاد نتائج فعلية. كل مصدر يُفحَص أمنياً ويُتحقق من أنه يستجيب.
+ */
+async function collectWebSources(
+  webResults: WebResult[],
+  services: ServiceRecord[],
+  max = 3
+): Promise<WebSourceLink[]> {
+  const usedLinks = new Set(services.map((s) => s.activationLink));
+  const picked: WebResult[] = [];
+  const seen = new Set<string>();
+  for (const w of webResults) {
+    if (!w.url || usedLinks.has(w.url) || seen.has(w.url)) continue;
+    seen.add(w.url);
+    if (!auditSnippet({ url: w.url, text: w.snippet }).safe) continue;
+    picked.push(w);
+    if (picked.length >= max) break;
+  }
+  const healthy = await Promise.all(
+    picked.map((w) => isLinkHealthy(w.url, 5000).catch(() => false))
+  );
+  return picked
+    .filter((_, i) => healthy[i])
+    .map((w) => ({ title: w.title || w.url, url: w.url, snippet: w.snippet, source: w.source }));
+}
+
+/**
+ * قلب البحث الذكي — مُصدَّر ليكون قابلاً للاختبار ولإعادة الاستخدام.
+ * ينفّذ: فهم الطلب (NLU) → جلب قاعدة البيانات → البحث الحي في الإنترنت
+ * → فحص أمني + تحقق من الروابط → تنويع (استبعاد ما عُرض سابقاً).
+ */
+export interface SearchOutcome {
+  nlu: ReturnType<typeof classifyQuery>;
+  requestedCount: number;
+  wantsLive: boolean;
+  usedWeb: boolean;
+  blocked: number;
+  lowQuality: number;
+  services: ServiceRecord[];
+  webResults: WebResult[];
+  excluded: string[];
+  /** تم تدوير مجموعة البحث لتقديم خيارات جديدة (طلب متكرر / طلب المزيد) */
+  rotated: boolean;
+  /** ملاحظة تُعرض للمستخدم عند إعادة تدوير القائمة كاملة (منع الطريق المسدود) */
+  fallbackNote: string;
+}
+
+export async function performSmartSearch(
+  rawQuery: string,
+  telegramId = "?",
+  opts: { forceLive?: boolean; excludeDb?: boolean } = {}
+): Promise<SearchOutcome> {
+  const q = rawQuery.trim();
+  const nlu = classifyQuery(q);
+  const requestedCount = extractCount(q);
+  const wantsLive =
+    opts.forceLive ||
+    wantsLiveSearch(q) ||
+    (!nlu.category && isGeneralQuery(q));
+
+  const dbServices = await fetchServices({ category: nlu.category });
+
+  // تنويع النتائج: استبعاد ما عُرض لهذا المستخدم سابقاً (الركيزة الثالثة)
+  const recentlyShown = await fetchRecentMatches(telegramId, 4).catch((e) => {
+    console.error("[bot] تعذّر جلب نتائج مطابقة سابقة:", (e as Error).message);
+    return [] as string[];
+  });
+  const askedForMore =
+    requestedCount > 3 || /أخرى|اخرى|أكثر|المزيد|غيرها|more|another|different|other/i.test(q);
+
+  let services: ServiceRecord[];
+  let webResults: WebResult[] = [];
+  let usedWeb = false;
+  let blocked = 0;
+  let lowQuality = 0;
+  let rotated = false;
+  let fallbackNote = "";
+
+  if (wantsLive || askedForMore || dbServices.length === 0 || (nlu.intent === "search" && !nlu.category)) {
+    const merged = await mergeWithWebSearch(q, dbServices, requestedCount, {
+      forceLive: wantsLive,
+      category: nlu.category,
+      excludeNames: recentlyShown,
+    });
+    services = merged.services;
+    webResults = merged.webResults;
+    usedWeb = merged.usedWeb;
+    blocked = merged.blocked;
+    lowQuality = merged.lowQuality;
+
+    // تدوير النتائج (الركيزة الثالثة): استُهلكت نتائج الاستعلام نفسه -> نتقدّم في مجموعة
+    // البحث لنقدّم خيارات جديدة تماماً بدل الرد الفارغ.
+    if (services.length < requestedCount) {
+      const second = await mergeWithWebSearch(q, dbServices, requestedCount, {
+        forceLive: true,
+        category: nlu.category,
+        excludeNames: [...recentlyShown, ...services.map((s) => s.name)],
+        webOffset: requestedCount,
+      }).catch((e) => {
+        console.warn("[bot] تعذّر تدوير نتائج البحث:", (e as Error).message);
+        return null;
+      });
+      if (second) {
+        rotated = true;
+        if (second.services.length > services.length) {
+          services = second.services;
+          usedWeb = usedWeb || second.usedWeb;
+        }
+        webResults = [...webResults, ...second.webResults];
+        blocked += second.blocked;
+        lowQuality += second.lowQuality;
+      }
+    }
+
+    // لا طريق مسدود أبداً: إن لم يتبقَّ جديد بعد التدوير، نُعيد أفضل ما لدينا
+    // (مطابق فعلاً) مع توضيح أننا أدرنا القائمة كاملة — أوضح من رد فارغ.
+    if (!services.length && recentlyShown.length) {
+      const cycle = rankServices(dbServices, nlu, requestedCount);
+      const restored = (cycle.length ? cycle : dbServices).slice(0, requestedCount);
+      if (restored.length) {
+        services = restored;
+        fallbackNote =
+          "🔄 <i>أدرنا قائمة النتائج كاملةً في هذه الجلسة — هذه هي الخيارات الأقوى مجدداً. اطلب مجالاً أضيق أو صيغة مختلفة للحصول على مجموعة جديدة.</i>";
+      }
+    }
+  } else {
+    const ranked = rankServices(dbServices, nlu, requestedCount);
+    services = ranked.length
+      ? ranked.slice(0, requestedCount)
+      : nlu.category || !nlu.query
+        ? dbServices.slice(0, requestedCount)
+        : [];
+  }
+
+  // استبعاد خدمات قاعدة البيانات إن طُلب صراحةً (الردود العامة لا تُلحق بها)
+  if (opts.excludeDb) {
+    services = services.filter((s) => s.slug.startsWith("web-"));
+  }
+
+  return {
+    nlu,
+    requestedCount,
+    wantsLive,
+    usedWeb,
+    blocked,
+    lowQuality,
+    services,
+    webResults,
+    excluded: recentlyShown,
+    rotated,
+    fallbackNote,
+  };
 }
 
 /** بحث ذكي مشترك بين /search والرسائل الحرة - يرد برسالة حوارية واحدة مجمّعة */ 
@@ -211,47 +455,37 @@ async function runSmartSearch(ctx: Context, rawQuery: string) {
     return;
   }
 
-  // تحديد عدد النتائج المطلوبة
-  const requestedCount = extractCount(q);
-  const wantsLive = wantsLiveSearch(q) || (!nlu.category && isGeneralQuery(q));
-
-  // 2) جلب خدمات قاعدة البيانات
-  const dbServices = await fetchServices({ category: nlu.category });
-
-  // 3) دمج مع البحث في الإنترنت عند الحاجة
-  let finalServices: ServiceRecord[];
-  let webResults: WebResult[] = [];
-  let usedWeb = false;
-
-  if (wantsLive || dbServices.length === 0 || (nlu.intent === "search" && !nlu.category)) {
-    const merged = await mergeWithWebSearch(q, dbServices, requestedCount);
-    finalServices = merged.services;
-    webResults = merged.webResults;
-    usedWeb = merged.usedWeb;
-  } else {
-    const ranked = rankServices(dbServices, nlu);
-    finalServices = ranked.length
-      ? ranked.slice(0, requestedCount)
-      : nlu.category || !nlu.query
-        ? dbServices.slice(0, requestedCount)
-        : [];
-  }
+  // 2) تنفيذ البحث (قاعدة بيانات + بحث حي + فحص أمني + تنويع)
+  const isApiRequest = isApiToolRequest(q);
+  const outcome = await performSmartSearch(q, telegramId, {
+    forceLive: isApiRequest,
+    excludeDb: !isApiRequest,
+  });
+  const { requestedCount, usedWeb, blocked, lowQuality, webResults, fallbackNote } = outcome;
+  const finalServices = outcome.services;
 
   // إشارة إلى حجب الخدمات في بلد المستخدم -> نرفق بدائل تعمل عالمياً
   const blockedSignal = /محجوب|محجوبه|محظور|لا تعمل|لايعمل|غير متاح|blocked|block/i.test(q);
 
-  // 3) الرد الحواري الذكي (مع سجل المحادثة المحفوظ)
+  // 3) الرد الحواري الذكي (مع سجل المحادثة المحفوظ + نتائج البحث الحي)
   const lead = await generateConversationalLead({
     telegramId,
     query: q,
     firstName: ctx.from?.first_name,
     services: finalServices,
-    suggestions: finalServices.length ? [] : dbServices.slice(0, 2),
+    suggestions: finalServices.length ? [] : await fetchServices().then((all) => all.slice(0, 2)).catch((e) => {
+      console.error("[bot] تعذّر جلب اقتراحات:", (e as Error).message);
+      return [];
+    }),
     blockedSignal,
     live,
+    webResults,
+    requestedCount,
   });
 
   // 4) تسجيل الاستعلام + الذاكرة (لا يُفشل الرد إن فشلا)
+  //    rememberShown: يضمن استبعاد هذه النتائج في الطلب التالي حتى لو تعذّر حفظ السجل
+  if (finalServices.length) rememberShown(telegramId, finalServices.map((s) => s.name));
   await logUserQuery({
     telegramId,
     firstName: ctx.from?.first_name ?? null,
@@ -259,28 +493,71 @@ async function runSmartSearch(ctx: Context, rawQuery: string) {
     query: q,
     intent: nlu.intent + (nlu.category ? `:${nlu.category}` : ""),
     matched: finalServices.map((s) => s.name),
-  }).catch(() => {});
-  await saveChatMessage(telegramId, "user", q).catch(() => {});
+  }).catch((e) => {
+    console.error("[bot] تعذّر تسجيل الاستعلام:", (e as Error).message);
+  });
+  await saveChatMessage(telegramId, "user", q).catch((e) => {
+    console.error("[bot] تعذّر حفظ رسالة المستخدم:", (e as Error).message);
+  });
   const leadText = lead?.lead ?? "";
   if (leadText) {
-    await saveChatMessage(telegramId, "assistant", stripHtml(leadText)).catch(() => {});
+    await saveChatMessage(telegramId, "assistant", stripHtml(leadText)).catch((e) => {
+      console.error("[bot] تعذّر حفظ رد النموذج:", (e as Error).message);
+    });
   }
 
   // 5) إرسال الرد
   const keyboard = searchKeyboard(finalServices);
+  const webNote = usedWeb
+    ? `\n\n🔍 <i>شملت نتائج من البحث اللحظي في الإنترنت${
+        blocked + lowQuality > 0
+          ? ` بعد استبعاد ${blocked + lowQuality} نتيجة (فحص أمني/تحقق من الرابط/جودة)`
+          : ""
+      }.</i>`
+    : "";
+  // ملاحظة التدوير/منع الطريق المسدود (تُلحق بأي رد يعرض خدمات)
+  const cycleNote = fallbackNote ? `\n\n${fallbackNote}` : "";
+
+  // مصادر ويب حقيقية (مقالات/أخبار/توثيق): تُعرض وحدها إن لم توجد خدمات،
+  // وإلا تُلحق برد الخدمات كمراجع إضافية تُثري نتيجة البحث.
+  const webSources = webResults.length
+    ? await collectWebSources(webResults, finalServices, finalServices.length ? 2 : 3).catch((e) => {
+        console.error("[bot] تعذّر جمع مصادر الويب:", (e as Error).message);
+        return [] as WebSourceLink[];
+      })
+    : [];
+
   if (finalServices.length) {
+    // حماية: إن أنكر النموذج قدرته على البحث رغم توفر نتائج حقيقية، نتجاهل تمهيدته
+    let safeLead = leadText;
+    if (safeLead && /لا أستطيع (البحث|الوصول|التصفح)|لا يمكنني (البحث|الوصول|التصفح)|cannot (search|browse)|can'?t (search|browse)|لا أملك صلاحية/i.test(safeLead)) {
+      console.warn("[bot] تجاهل تمهيدة تنكر البحث الحي — استُخدم الرد القالبي.");
+      safeLead = "";
+    }
+
+    const extraSources = formatWebSourcesSection(webSources);
     let text: string;
-    if (leadText) {
-      text = buildConversationalBlock(leadText, finalServices, blockedSignal, live);
+    if (safeLead) {
+      text = withNote(
+        buildConversationalBlock(safeLead, finalServices, blockedSignal, live) + extraSources + webNote
+      );
     } else {
-      const note = usedWeb
-        ? "\n\n🔍 <i>شملت نتائج من البحث اللحظي في الإنترنت.</i>"
-        : "";
-      text = withNote(formatSearchResultsReply(nlu.query || q, finalServices, blockedSignal ? blockedNote() : "") + note);
+      text = withNote(
+        formatSearchResultsReply(nlu.query || q, finalServices, blockedSignal ? blockedNote() : "") +
+          extraSources +
+          webNote
+      );
     }
     return keyboard
       ? ctx.replyWithHTML(text, { reply_markup: keyboard })
       : ctx.replyWithHTML(text);
+  }
+
+  // لا نتائج خدمات — لكن قد تكون هناك نتائج بحث حيّة حقيقية (أخبار/مقالات/توثيق)
+  if (webSources.length) {
+    return ctx.replyWithHTML(
+      withNote(formatWebSourcesReply(q, webSources, leadText, blockedSignal ? blockedNote() : ""))
+    );
   }
 
   // لا نتائج إطلاقاً
@@ -288,7 +565,8 @@ async function runSmartSearch(ctx: Context, rawQuery: string) {
     const text = buildConversationalBlock(leadText, [], blockedSignal, live);
     return ctx.replyWithHTML(text, { reply_markup: categoriesKeyboard() });
   }
-  return ctx.replyWithHTML(withNote(formatNoResults(q, dbServices.slice(0, 2))), {
+  const suggestions = await fetchServices().then((all) => all.slice(0, 2)).catch(() => []);
+  return ctx.replyWithHTML(withNote(formatNoResults(q, suggestions)), {
     reply_markup: categoriesKeyboard(),
   });
 }

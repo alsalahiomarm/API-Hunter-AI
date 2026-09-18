@@ -40,7 +40,8 @@ async function trySerper(query: string, limit: number): Promise<WebResult[]> {
       snippet: clean(it.snippet),
       source: "google",
     }));
-  } catch {
+  } catch (e) {
+    console.error("[web][serper] تعذّر البحث:", (e as Error).message);
     return [];
   }
 }
@@ -66,7 +67,8 @@ async function tryFirecrawl(query: string, limit: number): Promise<WebResult[]> 
       snippet: clean(it.description),
       source: "firecrawl",
     }));
-  } catch {
+  } catch (e) {
+    console.error("[web][firecrawl] تعذّر البحث:", (e as Error).message);
     return [];
   }
 }
@@ -110,7 +112,40 @@ async function tryDuckDuckGo(query: string, limit: number): Promise<WebResult[]>
       });
     }
     return out;
-  } catch {
+  } catch (e) {
+    console.error("[web][duckduckgo] تعذّر البحث:", (e as Error).message);
+    return [];
+  }
+}
+
+/** Jina Reader Search (s.jina.ai) — بحث يعمل من الخوادم بمفتاح مجاني ويقاوم الحجب */
+async function tryJina(query: string, limit: number): Promise<WebResult[]> {
+  const key = env("JINA_API_KEY");
+  if (!key) return [];
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    const res = await fetch(`https://s.jina.ai/?q=${encodeURIComponent(query)}`, {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${key}`,
+        "X-Respond-With": "no-content",
+      },
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return [];
+    const data: any = await res.json();
+    const rows: any[] = Array.isArray(data?.data) ? data.data : [];
+    return rows.slice(0, limit).map((it: any) => ({
+      title: clean(it.title),
+      url: String(it.url ?? "").trim(),
+      snippet: clean(it.description ?? it.content),
+      source: "jina",
+    }));
+  } catch (e) {
+    console.error("[web][jina] تعذّر البحث:", (e as Error).message);
     return [];
   }
 }
@@ -118,23 +153,40 @@ async function tryDuckDuckGo(query: string, limit: number): Promise<WebResult[]>
 /**
  * بحث ويب متعدد المصادر مع تحويل تلقائي.
  * لا ترمي أخطاء أبداً — تُرجع [] عند فشل الجميع.
+ *
+ * `offset` يتيح **تدوير النتائج**: عند تكرار السؤال أو طلب المزيد، نطلب مجموعة أوسع
+ * من المحرك ثم نقتطع من موضع متقدّم، فتظهر نتائج جديدة حقيقية بدل تكرار نفس القائمة
+ * (الركيزة الثالثة: تنويع النتائج وتجنب التكرار).
  */
-export async function searchWeb(query: string, limit = 5): Promise<WebResult[]> {
+export interface WebSearchOptions {
+  /** موضع البداية داخل مجموعة النتائج (0 = الأوائل) */
+  offset?: number;
+}
+
+export async function searchWeb(
+  query: string,
+  limit = 5,
+  opts: WebSearchOptions = {}
+): Promise<WebResult[]> {
   const q = query.trim().slice(0, 200);
   if (!q) return [];
   const need = Math.max(1, Math.min(limit, 8));
+  const offset = Math.max(0, Math.floor(opts.offset ?? 0));
+  // مجموعة أوسع من المطلوب كي تكون الإزاحة قادرة على تقديم نتائج لم تُعرض بعد
+  const pool = Math.min(need + offset, 10);
 
-  const [a, b, c] = await Promise.all([
-    trySerper(q, need),
-    tryFirecrawl(q, need),
-    tryDuckDuckGo(q, need),
+  const [a, b, c, d] = await Promise.all([
+    trySerper(q, pool),
+    tryFirecrawl(q, pool),
+    tryJina(q, pool),
+    tryDuckDuckGo(q, pool),
   ]);
 
   const seen = new Set<string>();
-  const merged = [...a, ...b, ...c].filter((r) => {
+  const merged = [...a, ...b, ...d, ...c].filter((r) => {
     if (!r.url || seen.has(r.url)) return false;
     seen.add(r.url);
     return true;
   });
-  return merged.slice(0, need);
+  return merged.slice(offset, offset + need);
 }

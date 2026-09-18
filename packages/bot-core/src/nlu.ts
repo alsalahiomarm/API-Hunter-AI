@@ -29,6 +29,12 @@ const GREETINGS = [
   "start",
 ];
 
+/** هل الطلب يطلب خدمة/أداة API محددة (وليس استفساراً عاماً)؟ */
+export function isApiToolRequest(raw: string): boolean {
+  const n = normalize(raw);
+  return /مفتاح|api|tool|service|key|أداة برمجة|service api|endpoint|sdk|developer|documentation|console|ابحث عن.*(api|مفتاح|أداة)|(api|مفتاح|أداة).*ابحث|أعطني.*(api|مفتاح|أداة)|(api|مفتاح|أداة).*أعطني/i.test(n);
+}
+
 /** هل النص مجرد تحية؟ */
 export function isGreeting(raw: string): boolean {
   const n = normalize(raw).replace(/[^\p{L}\s]/gu, "").trim();
@@ -112,7 +118,15 @@ const IGNORED = new Set([
   "ا","فى","في","من","الي","على","اعطيني","اعطني","اريد","احتاج","ابحث",
   "افضل","مفتاح","مفاتيح","api","مجاني","مجانا","بالعربي","وش","من فضلك",
   "كيف","شلون",
+  // ضمائر وأدوات استفهام شائعة (تمنع مطابقة "ما" داخل "خدمات" وغيرها)
+  "ما","هي","هو","هل","انا","انت","نحن","عن","او","ام","ثم","هذا","هذه",
+  "ذلك","التي","الذي","كل","بعض","اي","ايش","عندي","لي","لك","مع","الى",
+  "the","a","an","of","for","to","is","are","and","or","me","my","i","you",
+  "please","give","show","find","need","want","get","about","with","on","in",
 ]);
+
+/** كلمات قصيرة (حرفان/ثلاثة) تُطابق بحدود كلمات فقط لتجنب المطابقة داخل كلمات أخرى */
+const SHORT_PART_RE = /^[\p{L}\p{N}]{2,3}$/u;
 
 export function classifyQuery(raw: string): NluResult {
   const words = normalize(raw);
@@ -163,8 +177,10 @@ function containsPhrase(text: string, phrase: string): boolean {
 /** ترتيب مطابقة الخدمات مع طلب المستخدم */
 export function rankServices(
   services: ServiceRecord[],
-  nlu: NluResult
+  nlu: NluResult,
+  limit = 3
 ): ServiceRecord[] {
+  const top = Math.max(1, limit);
   const q = normalize(nlu.query);
 
   const scored = services.map((s) => {
@@ -179,6 +195,12 @@ export function rankServices(
       else {
         for (const part of q.split(" ")) {
           if (part.length < 2) continue;
+          // الكلمات القصيرة (2-3 أحرف) تُطابق بحدود كلمات فقط: "ما" لا تطابق "خدمات"
+          if (SHORT_PART_RE.test(part)) {
+            if (containsPhrase(name, part)) textScore += 2;
+            else if (containsPhrase(haystack, part)) textScore += 1;
+            continue;
+          }
           if (name.includes(part)) textScore += 2;
           else if (haystack.includes(part)) textScore += 1;
         }
@@ -200,6 +222,6 @@ export function rankServices(
     .filter((x) => x.relevance > 0) // لا نتائج وهمية: لا بد من تطابق فعلي
     .map((x) => ({ ...x, tiebreak: Math.random() })) // تنويع: لا تتكرر نفس الإجابة حرفياً
     .sort((a, b) => b.total - a.total || a.tiebreak - b.tiebreak)
-    .slice(0, 3)
+    .slice(0, top)
     .map((x) => x.s);
 }
